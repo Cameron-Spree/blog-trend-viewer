@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Performance Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="brand">
+                <i data-lucide="activity"></i>
+                <h2>Trend Viewer</h2>
+            </div>
+            
+            <ul class="nav-links">
+                <li class="nav-item active" data-tab="home">
+                    <i data-lucide="home"></i>
+                    <span>Dashboard Home</span>
+                </li>
+                <li class="nav-item disabled" data-tab="date">
+                    <i data-lucide="calendar"></i>
+                    <span>Post Dates</span>
+                </li>
+                <li class="nav-item disabled" data-tab="category">
+                    <i data-lucide="folder-tree"></i>
+                    <span>Categories</span>
+                </li>
+                <li class="nav-item disabled" data-tab="content">
+                    <i data-lucide="file-text"></i>
+                    <span>Content Analysis</span>
+                </li>
+            </ul>
+
+            <div class="status-panel">
+                <div class="status-indicator"></div>
+                <span id="status-text">Awaiting CSV</span>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div>
+                    <h1 id="page-title">Blog Performance Hub</h1>
+                    <p id="page-subtitle">Upload your Search Console data to begin correlation analysis.</p>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary" id="trigger-upload" onclick="document.getElementById('csv-file').click()">
+                        <i data-lucide="upload"></i> Upload GSC CSV
+                    </button>
+                    <input type="file" id="csv-file" accept=".csv" style="display: none;" />
+                </div>
+            </header>
+
+            <div class="tab-content-container">
+                <!-- HOME TAB -->
+                <section id="tab-home" class="tab-pane active">
+                    <div class="card instructions-card">
+                        <h3><i data-lucide="info"></i> How to Generate Your CSV Data</h3>
+                        <p>To use this dashboard, you need to provide a Google Search Console CSV export.</p>
+                        <ol>
+                            <li>Log in to <strong>Google Search Console</strong>.</li>
+                            <li>Go to the <strong>Performance</strong> > <strong>Search results</strong> report.</li>
+                            <li>Ensure you have the Dates set to a meaningful range (e.g., Last 3 Months).</li>
+                            <li>Switch the view to the <strong>Pages</strong> tab below the chart.</li>
+                            <li>Click the <strong>Export</strong> button (top right) and select <strong>Download CSV</strong>.</li>
+                            <li>Extract the ZIP and locate the <strong>Pages.csv</strong> file.</li>
+                            <li>Upload that file here using the button in the top right.</li>
+                        </ol>
+                    </div>
+
+                    <div id="dropzone" class="dropzone">
+                        <i data-lucide="arrow-down-circle" style="width: 48px; height: 48px; color: var(--text-muted);"></i>
+                        <h3>Drag & Drop Pages.csv</h3>
+                        <p>or click the upload button above.</p>
+                    </div>
+                    
+                    <div id="processing-view" class="hidden card processing-card">
+                        <div class="loader"></div>
+                        <h3>Analyzing URLs</h3>
+                        <p>We are scraping the blogs found in your CSV to extract word count, headings, images, and publish dates.</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="crawl-progress"></div>
+                        </div>
+                        <p id="progress-text">0 / 0 URLs Processed</p>
+                    </div>
+                </section>
+
+                <!-- DATE TAB -->
+                <section id="tab-date" class="tab-pane">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h4>Best Day to Post</h4>
+                            <div class="metric-value" id="best-day">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Average Time to Rank</h4>
+                            <div class="metric-value">N/A</div>
+                            <div class="metric-subtitle">Requires historical ranking dates</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container card">
+                        <h3>Performance by Day of the Week (Posted)</h3>
+                        <canvas id="chart-day-of-week"></canvas>
+                    </div>
+
+                    <div class="chart-container card">
+                        <h3>Clicks vs Publish Date</h3>
+                        <canvas id="chart-publish-date"></canvas>
+                    </div>
+                </section>
+
+                <!-- CATEGORY TAB -->
+                <section id="tab-category" class="tab-pane">
+                    <div class="chart-container card">
+                        <h3>Traffic by Category</h3>
+                        <canvas id="chart-categories"></canvas>
+                    </div>
+                    <div class="card mt-4 table-card">
+                        <h3>Top Performing Categories</h3>
+                        <table id="category-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Total Posts</th>
+                                    <th>Avg Clicks</th>
+                                    <th>Avg Impressions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Handled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- CONTENT ANALYSIS TAB -->
+                <section id="tab-content" class="tab-pane">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h4>Avg Word Count (Top 10% Traffic)</h4>
+                            <div class="metric-value" id="avg-word-count-top">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Avg Images (Top 10% Traffic)</h4>
+                            <div class="metric-value" id="avg-images-top">-</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row">
+                        <div class="chart-container card half">
+                            <h3>Word Count vs Clicks</h3>
+                            <canvas id="chart-wordcount"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Image Count vs Clicks</h3>
+                            <canvas id="chart-images"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container card mt-4">
+                        <h3>Headings (H1, H2, H3) vs Performance</h3>
+                        <canvas id="chart-headings"></canvas>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
