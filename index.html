@@ -55,9 +55,15 @@
                     <h1 id="page-title">Blog Performance Hub</h1>
                     <p id="page-subtitle">Upload your Search Console data to begin correlation analysis.</p>
                 </div>
-                <div class="actions">
+                <div class="actions" style="display: flex; gap: 10px; align-items: center;">
+                    <button class="theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
+                        <i data-lucide="sun"></i>
+                    </button>
                     <button class="btn btn-primary" id="trigger-upload" onclick="document.getElementById('csv-file').click()">
                         <i data-lucide="upload"></i> Upload GSC CSV
+                    </button>
+                    <button class="btn" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main);" onclick="clearAllData()">
+                        <i data-lucide="trash-2"></i> Clear
                     </button>
                     <input type="file" id="csv-file" accept=".csv" style="display: none;" />
                 </div>
@@ -178,6 +184,7 @@
         </main>
     </div>
 
+    <div id="toast-container"></div>
     <script src="app.js"></script>
     <script>
         lucide.createIcons();

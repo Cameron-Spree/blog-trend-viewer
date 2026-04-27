@@ -1,6 +1,7 @@
 :root {
-    --bg-dark: #0f1115;
-    --bg-darker: #0a0b0d;
+    /* Dark Theme (Default) */
+    --bg-main: #0f1115;
+    --bg-secondary: #0a0b0d;
     --card-bg: rgba(25, 28, 35, 0.6);
     --card-border: rgba(255, 255, 255, 0.08);
     --primary: #6366f1;
@@ -11,8 +12,19 @@
     --success: #10b981;
     --danger: #ef4444;
     --sidebar-width: 260px;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     
     font-family: 'Inter', sans-serif;
+}
+
+:root.light-mode {
+    --bg-main: #f8fafc;
+    --bg-secondary: #ffffff;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --card-border: rgba(0, 0, 0, 0.08);
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -22,10 +34,11 @@
 }
 
 body {
-    background-color: var(--bg-dark);
+    background-color: var(--bg-main);
     color: var(--text-main);
     min-height: 100vh;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Glassmorphism utility */
@@ -44,11 +57,12 @@ body {
 /* Sidebar */
 .sidebar {
     width: var(--sidebar-width);
-    background-color: var(--bg-darker);
+    background-color: var(--bg-secondary);
     border-right: 1px solid var(--card-border);
     display: flex;
     flex-direction: column;
     padding: 1.5rem 0;
+    transition: background-color 0.3s ease;
 }
 
 .brand {
@@ -160,6 +174,57 @@ body {
     color: var(--text-muted);
 }
 
+.theme-toggle {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.notification-toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--primary);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+    z-index: 1000;
+    animation: slideUp 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.notification-toast button {
+    background: white;
+    color: var(--primary);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
@@ -266,7 +331,7 @@ body {
     font-size: 2.5rem;
     font-weight: 700;
     color: var(--text-main);
-    background: linear-gradient(135deg, #fff, #94a3b8);
+    background: linear-gradient(135deg, var(--text-main), var(--text-muted));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
