@@ -19,14 +19,20 @@ const metricPalette = {
     clicks: '#6366f1',
     impressions: '#10b981',
     ctr: '#38bdf8',
-    position: '#f59e0b'
+    position: '#f59e0b',
+    revenue: '#a855f7',
+    conversions: '#ec4899',
+    engagementRate: '#14b8a6'
 };
 
 const metricLabels = {
     clicks: 'Clicks',
     impressions: 'Impressions',
     ctr: 'CTR',
-    position: 'Position'
+    position: 'Position',
+    revenue: 'Revenue (£)',
+    conversions: 'Conversions',
+    engagementRate: 'Engagement Rate'
 };
 
 // ============================================================
@@ -476,17 +482,17 @@ function renderBlogList() {
         const pubDate = b.publishDate ? b.publishDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
         return `<tr>
             <td>${b.title || '-'}</td>
-            <td title="${b.url}" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${shortUrl}</td>
             <td>${b.clicks.toLocaleString()}</td>
             <td>${b.impressions.toLocaleString()}</td>
             <td>${b.ctr.toFixed(2)}%</td>
             <td>${Number(b.position).toFixed(1)}</td>
+            <td style="color:var(--success)">£${b.revenue ? Number(b.revenue).toLocaleString() : '0'}</td>
+            <td>${b.conversions || 0}</td>
+            <td>${b.engagementRate ? Number(b.engagementRate).toFixed(1)+'%' : '-'}</td>
+            <td>${b.ageInDays || '-'}</td>
             <td>${b.wordCount || '-'}</td>
-            <td>${b.headingCount || '-'}</td>
-            <td>${b.imageCount || '-'}</td>
-            <td>${b.author || '-'}</td>
+            <td>${b.internalLinks || 0}</td>
             <td>${b.category}</td>
-            <td>${pubDate}</td>
             <td>
                 <button class="btn btn-sm" style="color:var(--danger); border:1px solid var(--danger); background:transparent; padding: 0.25rem 0.5rem;" onclick="removeBlog('${b.url}')">
                     Remove
@@ -525,14 +531,15 @@ function exportData() {
 // ============================================================
 function analyzeData() {
     let tClicks = 0, tImp = 0, tCtrSum = 0, tPosSum = 0;
+    let tRev = 0, tConv = 0, tEngSum = 0, engCount = 0;
     
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayStats = {};
-    for (let i = 0; i < 7; i++) dayStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+    for (let i = 0; i < 7; i++) dayStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, rev: 0, conv: 0, engSum: 0, ct: 0, engCt: 0 };
     
     const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
     const hourStats = {};
-    for (let i = 0; i < 24; i++) hourStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+    for (let i = 0; i < 24; i++) hourStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, rev: 0, conv: 0, engSum: 0, ct: 0, engCt: 0 };
 
     const catStats = {};
 
@@ -541,6 +548,12 @@ function analyzeData() {
         tImp += item.impressions;
         tCtrSum += item.ctr;
         tPosSum += item.position;
+        tRev += (item.revenue || 0);
+        tConv += (item.conversions || 0);
+        if (item.engagementRate) {
+            tEngSum += item.engagementRate;
+            engCount++;
+        }
 
         if (item.publishDate) {
             const d = new Date(item.publishDate);
@@ -550,14 +563,20 @@ function analyzeData() {
                 dayStats[day].impressions += item.impressions;
                 dayStats[day].ctrSum += item.ctr;
                 dayStats[day].posSum += item.position;
+                dayStats[day].rev += (item.revenue || 0);
+                dayStats[day].conv += (item.conversions || 0);
                 dayStats[day].ct += 1;
+                if(item.engagementRate) { dayStats[day].engSum+=item.engagementRate; dayStats[day].engCt++; }
 
                 const hour = d.getHours();
                 hourStats[hour].clicks += item.clicks;
                 hourStats[hour].impressions += item.impressions;
                 hourStats[hour].ctrSum += item.ctr;
                 hourStats[hour].posSum += item.position;
+                hourStats[hour].rev += (item.revenue || 0);
+                hourStats[hour].conv += (item.conversions || 0);
                 hourStats[hour].ct += 1;
+                if(item.engagementRate) { hourStats[hour].engSum+=item.engagementRate; hourStats[hour].engCt++; }
             }
         }
         
@@ -566,12 +585,15 @@ function analyzeData() {
         if (cats.length === 0) cats.push('Uncategorized');
         
         cats.forEach(cat => {
-            if (!catStats[cat]) catStats[cat] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+            if (!catStats[cat]) catStats[cat] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, rev: 0, conv: 0, engSum: 0, ct: 0, engCt: 0 };
             catStats[cat].clicks += item.clicks;
             catStats[cat].impressions += item.impressions;
             catStats[cat].ctrSum += item.ctr;
             catStats[cat].posSum += item.position;
+            catStats[cat].rev += (item.revenue || 0);
+            catStats[cat].conv += (item.conversions || 0);
             catStats[cat].ct += 1;
+            if(item.engagementRate) { catStats[cat].engSum+=item.engagementRate; catStats[cat].engCt++; }
         });
     });
 
@@ -580,6 +602,11 @@ function analyzeData() {
     document.getElementById('global-impressions').innerText = tImp.toLocaleString();
     document.getElementById('global-ctr').innerText = State.merged.length ? (tCtrSum / State.merged.length).toFixed(2) + '%' : '-';
     document.getElementById('global-position').innerText = State.merged.length ? (tPosSum / State.merged.length).toFixed(1) : '-';
+    
+    document.getElementById('global-revenue').innerText = '£' + tRev.toLocaleString();
+    document.getElementById('global-conversions').innerText = tConv.toLocaleString();
+    document.getElementById('global-engagementRate').innerText = engCount ? (tEngSum / engCount).toFixed(1) + '%' : '-';
+    
     document.getElementById('total-blogs-count').innerText = State.merged.length;
 
     // Bests
@@ -618,6 +645,7 @@ function buildAllCharts() {
     buildContentCharts();
     buildCtrCharts();
     buildPositionCharts();
+    buildAnalyticsCharts();
 }
 
 function buildActionAlerts() {
@@ -696,6 +724,86 @@ function buildActionAlerts() {
             <td>${b.clicks.toLocaleString()}</td>
             <td>${b.engagementRate ? b.engagementRate.toFixed(1)+'%' : '-'}</td>
         </tr>`).join('');
+    }
+}
+
+function buildAnalyticsCharts() {
+    if (!State.merged || State.merged.length === 0) return;
+
+    const { gridColor } = State.analysisObj;
+
+    let tRev = 0, tConv = 0, tEngSum = 0, tTimeSum = 0, engCount = 0, timeCount = 0;
+    State.merged.forEach(b => {
+        tRev += (b.revenue || 0);
+        tConv += (b.conversions || 0);
+        if (b.engagementRate) { tEngSum += b.engagementRate; engCount++; }
+        if (b.avgTime) { tTimeSum += b.avgTime; timeCount++; }
+    });
+
+    const setEl = (id, v) => { const el = document.getElementById(id); if(el) el.innerText = v; };
+    setEl('analytics-total-revenue', '\u00a3' + tRev.toLocaleString());
+    setEl('analytics-total-conv', tConv.toLocaleString());
+    setEl('analytics-avg-eng', engCount ? (tEngSum/engCount).toFixed(1)+'%' : '-');
+    setEl('analytics-avg-time', timeCount ? Math.round(tTimeSum/timeCount)+'s' : '-');
+
+    const catRevMap = {}, catConvMap = {}, catEngMap = {}, catTimeMap = {};
+    State.merged.forEach(b => {
+        let cats = (b.category || 'Uncategorized').split(',').map(c => c.trim()).filter(Boolean);
+        if (!cats.length) cats = ['Uncategorized'];
+        cats.forEach(cat => {
+            if (!catRevMap[cat]) { catRevMap[cat]=0; catConvMap[cat]=0; catEngMap[cat]=[]; catTimeMap[cat]=[]; }
+            catRevMap[cat] += (b.revenue || 0);
+            catConvMap[cat] += (b.conversions || 0);
+            if (b.engagementRate) catEngMap[cat].push(b.engagementRate);
+            if (b.avgTime) catTimeMap[cat].push(b.avgTime);
+        });
+    });
+
+    const sortedCats = Object.keys(catRevMap).sort((a,b) => catRevMap[b]-catRevMap[a]).slice(0,12);
+    const avgArr = arr => arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0;
+
+    const makeBarCfg = (labels, data, color, yLabel) => ({
+        type: 'bar',
+        data: { labels, datasets: [{ label: yLabel, data, backgroundColor: color, borderRadius: 4 }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:gridColor}, beginAtZero:true} } }
+    });
+
+    const dc = (id, cfg) => {
+        if (State.charts[id]) State.charts[id].destroy();
+        const canvas = document.getElementById(id);
+        if (canvas) State.charts[id] = new Chart(canvas.getContext('2d'), cfg);
+    };
+
+    dc('chart-revenue-category',  makeBarCfg(sortedCats, sortedCats.map(c=>Math.round(catRevMap[c])),     '#a855f7', 'Revenue (\u00a3)'));
+    dc('chart-conv-category',     makeBarCfg(sortedCats, sortedCats.map(c=>catConvMap[c]),                '#ec4899', 'Conversions'));
+    dc('chart-eng-category',      makeBarCfg(sortedCats, sortedCats.map(c=>parseFloat(avgArr(catEngMap[c]).toFixed(1))), '#14b8a6', 'Avg Engagement Rate (%)'));
+    dc('chart-time-category',     makeBarCfg(sortedCats, sortedCats.map(c=>Math.round(avgArr(catTimeMap[c]))),          '#14b8a6', 'Avg Time (s)'));
+
+    dc('chart-revenue-clicks', {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Revenue vs Clicks', data: State.merged.filter(b=>b.revenue>0).map(b=>({x:b.clicks,y:b.revenue})), backgroundColor: '#a855f7' }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{grid:{display:false},title:{display:true,text:'Clicks'}}, y:{grid:{color:gridColor},beginAtZero:true,title:{display:true,text:'Revenue (\u00a3)'}} } }
+    });
+
+    dc('chart-eng-wordcount', {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Eng. Rate vs Word Count', data: State.merged.filter(b=>b.engagementRate>0&&b.wordCount>0).map(b=>({x:b.wordCount,y:b.engagementRate})), backgroundColor: '#14b8a6' }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ x:{grid:{display:false},title:{display:true,text:'Word Count'}}, y:{grid:{color:gridColor},beginAtZero:true,title:{display:true,text:'Engagement Rate (%)'}} } }
+    });
+
+    const top10 = [...State.merged].filter(b=>b.revenue>0).sort((a,b)=>b.revenue-a.revenue).slice(0,10);
+    const tbl = document.querySelector('#analytics-top-revenue tbody');
+    if (tbl) {
+        tbl.innerHTML = top10.length === 0
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1rem;">No revenue data \u2014 upload the GA4 Commerce CSV to see results here.</td></tr>'
+            : top10.map(b=>`<tr>
+                <td title="${b.url}">${b.title||b.url.split('/').pop()}</td>
+                <td style="color:#a855f7;font-weight:600;">\u00a3${Number(b.revenue).toLocaleString()}</td>
+                <td>${b.conversions||0}</td>
+                <td>${b.clicks.toLocaleString()}</td>
+                <td>${b.engagementRate?b.engagementRate.toFixed(1)+'%':'-'}</td>
+                <td>${b.avgTime?Math.round(b.avgTime)+'s':'-'}</td>
+            </tr>`).join('');
     }
 }
 

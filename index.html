@@ -42,6 +42,9 @@
                 <li class="nav-item disabled" data-tab="position">
                     <i data-lucide="target"></i><span>Position Analysis</span>
                 </li>
+                <li class="nav-item disabled" data-tab="analytics">
+                    <i data-lucide="trending-up"></i><span>Analytics</span>
+                </li>
                 <li class="nav-item disabled" data-tab="alerts">
                     <i data-lucide="bell"></i><span>Action Alerts</span>
                 </li>
@@ -94,8 +97,29 @@
                 <div class="metric-toggle" data-metric="position" onclick="toggleMetric('position')">
                     <div class="toggle-checkbox"></div>
                     <div>
-                        <span class="toggle-label">Average Position</span>
+                        <span class="toggle-label">Avg Position</span>
                         <div class="toggle-value" id="global-position">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="revenue" onclick="toggleMetric('revenue')" style="border-top-color: var(--accent);">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Total Revenue</span>
+                        <div class="toggle-value" id="global-revenue">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="conversions" onclick="toggleMetric('conversions')" style="border-top-color: var(--accent);">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Total Conversions</span>
+                        <div class="toggle-value" id="global-conversions">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="engagementRate" onclick="toggleMetric('engagementRate')" style="border-top-color: var(--accent);">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Avg Engagement</span>
+                        <div class="toggle-value" id="global-engagementRate">-</div>
                     </div>
                 </div>
             </div>
@@ -191,17 +215,17 @@
                             <thead>
                                 <tr>
                                     <th class="sortable" data-sort="title">Title <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="url">URL <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th class="sortable" data-sort="clicks">Clicks <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th class="sortable" data-sort="impressions">Impr. <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th class="sortable" data-sort="ctr">CTR <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="position">Position <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="position">Pos <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="revenue">Revenue <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="conversions">Conv. <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="engagementRate">Eng. Rate <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="ageInDays">Age <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th class="sortable" data-sort="wordCount">Words <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="headingCount">Headings <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="imageCount">Images <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="author">Author <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="internalLinks">Links <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th class="sortable" data-sort="category">Category <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
-                                    <th class="sortable" data-sort="publishDate">Published <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -317,6 +341,83 @@
                         <div class="chart-container card half">
                             <h3>Position vs Category</h3>
                             <canvas id="chart-position-category"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ANALYTICS TAB -->
+                <section id="tab-analytics" class="tab-pane">
+                    <!-- Summary KPIs -->
+                    <div class="metrics-grid">
+                        <div class="metric-card" style="border-top-color: #a855f7;">
+                            <h4>Total Revenue</h4>
+                            <div class="metric-value" id="analytics-total-revenue">-</div>
+                            <p class="metric-sub">from blog referrals</p>
+                        </div>
+                        <div class="metric-card" style="border-top-color: #ec4899;">
+                            <h4>Total Conversions</h4>
+                            <div class="metric-value" id="analytics-total-conv">-</div>
+                            <p class="metric-sub">total purchases</p>
+                        </div>
+                        <div class="metric-card" style="border-top-color: #14b8a6;">
+                            <h4>Avg Engagement Rate</h4>
+                            <div class="metric-value" id="analytics-avg-eng">-</div>
+                            <p class="metric-sub">across all blogs</p>
+                        </div>
+                        <div class="metric-card" style="border-top-color: #14b8a6;">
+                            <h4>Avg Engagement Time</h4>
+                            <div class="metric-value" id="analytics-avg-time">-</div>
+                            <p class="metric-sub">seconds per session</p>
+                        </div>
+                    </div>
+
+                    <!-- Revenue & Conv by Category -->
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>Revenue by Category</h3>
+                            <canvas id="chart-revenue-category"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Conversions by Category</h3>
+                            <canvas id="chart-conv-category"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Engagement by Category -->
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>Engagement Rate by Category</h3>
+                            <canvas id="chart-eng-category"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Avg Engagement Time by Category</h3>
+                            <canvas id="chart-time-category"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Revenue vs Clicks scatter -->
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>Revenue vs Clicks</h3>
+                            <canvas id="chart-revenue-clicks"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Engagement Rate vs Word Count</h3>
+                            <canvas id="chart-eng-wordcount"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top 10 Revenue blogs -->
+                    <div class="card table-card mt-4" style="border-left: 4px solid #a855f7;">
+                        <div style="padding: 1.5rem; padding-bottom: 0;">
+                            <h3 style="color: #a855f7;"><i data-lucide="pound-sterling"></i> Top 10 Revenue Generating Blogs</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Blogs ranked by total E-commerce revenue attributed from blog referrals.</p>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1.5rem;">
+                            <table id="analytics-top-revenue">
+                                <thead><tr><th>Title</th><th>Revenue (£)</th><th>Conversions</th><th>Clicks</th><th>Eng. Rate</th><th>Avg Time (s)</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
