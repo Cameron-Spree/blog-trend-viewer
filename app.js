@@ -250,6 +250,10 @@ function mergeAndAnalyze() {
                 avgTime: 0,
                 conversions: 0,
                 revenue: 0,
+                itemsViewed: 0,
+                itemsAdded: 0,
+                itemsListV: 0,
+                itemsListC: 0,
                 internalLinks: 0,
                 ageInDays: 0
             };
@@ -354,6 +358,10 @@ function mergeAndAnalyze() {
             const g4RefKey = g4Keys.find(k => k.toLowerCase().includes('referrer') || k.toLowerCase().includes('page'));
             const revKey = g4Keys.find(k => k.toLowerCase().includes('revenue'));
             const purchKey = g4Keys.find(k => k.toLowerCase().includes('purchased') || k.toLowerCase().includes('conversion'));
+            const iViewKey = g4Keys.find(k => k.toLowerCase().includes('items viewed') && !k.toLowerCase().includes('list'));
+            const iAddKey = g4Keys.find(k => k.toLowerCase().includes('added to cart'));
+            const iListVKey = g4Keys.find(k => k.toLowerCase().includes('viewed in list'));
+            const iListCKey = g4Keys.find(k => k.toLowerCase().includes('clicked in list'));
 
             if (g4RefKey) {
                 State.ga4EcomData.forEach(row => {
@@ -371,13 +379,17 @@ function mergeAndAnalyze() {
                         if (purchKey) {
                             let purch = row[purchKey] || 0;
                             if (typeof purch === 'string') purch = parseFloat(purch.replace(/[^0-9.-]+/g,""));
-                            blog.conversions += (purch || 0); // Accumulate if multiple items per referring blog
+                            blog.conversions += (purch || 0);
                         }
                         if (revKey) {
                            let rev = row[revKey] || 0;
                            if (typeof rev === "string") rev = parseFloat(rev.replace(/[^0-9.-]+/g,""));
-                           blog.revenue += (rev || 0); // Accumulate item revenue
+                           blog.revenue += (rev || 0);
                         }
+                        if (iViewKey) blog.itemsViewed += (Number(row[iViewKey]) || 0);
+                        if (iAddKey) blog.itemsAdded += (Number(row[iAddKey]) || 0);
+                        if (iListVKey) blog.itemsListV += (Number(row[iListVKey]) || 0);
+                        if (iListCKey) blog.itemsListC += (Number(row[iListCKey]) || 0);
                     }
                 });
             }
@@ -504,7 +516,7 @@ function renderBlogList() {
 
 function exportData() {
     if(!State.merged.length) return alert('No data to export');
-    const cols = ['title', 'url', 'clicks', 'impressions', 'ctr', 'position', 'wordCount', 'headingCount', 'imageCount', 'internalLinks', 'category', 'publishDate', 'ageInDays', 'engagementRate', 'avgTime', 'conversions', 'revenue'];
+    const cols = ['title', 'url', 'clicks', 'impressions', 'ctr', 'position', 'wordCount', 'headingCount', 'imageCount', 'internalLinks', 'category', 'publishDate', 'ageInDays', 'engagementRate', 'avgTime', 'conversions', 'revenue', 'itemsViewed', 'itemsAdded', 'itemsListV', 'itemsListC'];
     const csvRows = [];
     csvRows.push(cols.join(','));
     State.merged.forEach(b => {
@@ -789,6 +801,62 @@ function buildAnalyticsCharts() {
         type: 'scatter',
         data: { datasets: [{ label: 'Eng. Rate vs Word Count', data: State.merged.filter(b=>b.engagementRate>0&&b.wordCount>0).map(b=>({x:b.wordCount,y:b.engagementRate})), backgroundColor: '#14b8a6' }] },
         options: { responsive:true, maintainAspectRatio:false, scales:{ x:{grid:{display:false},title:{display:true,text:'Word Count'}}, y:{grid:{color:gridColor},beginAtZero:true,title:{display:true,text:'Engagement Rate (%)'}} } }
+    });
+
+    // Product Funnel
+    let fViews = 0, fAdds = 0, fPurch = 0;
+    State.merged.forEach(b => {
+        fViews += (b.itemsViewed || 0);
+        fAdds += (b.itemsAdded || 0);
+        fPurch += (b.conversions || 0);
+    });
+    dc('chart-product-funnel', {
+        type: 'bar',
+        data: {
+            labels: ['Items Viewed', 'Added to Cart', 'Purchased'],
+            datasets: [{
+                data: [fViews, fAdds, fPurch],
+                backgroundColor: ['#38bdf8', '#818cf8', '#ec4899'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false }, beginAtZero: true } }
+        }
+    });
+
+    // Interactions by Category
+    const catIntMap = {};
+    State.merged.forEach(b => {
+        let cats = (b.category || 'Uncategorized').split(',').map(c => c.trim()).filter(Boolean);
+        if (!cats.length) cats = ['Uncategorized'];
+        cats.forEach(cat => {
+            if (!catIntMap[cat]) catIntMap[cat] = { views: 0, adds: 0, clicks: 0 };
+            catIntMap[cat].views += (b.itemsViewed || 0);
+            catIntMap[cat].adds += (b.itemsAdded || 0);
+            catIntMap[cat].clicks += (b.itemsListC || 0);
+        });
+    });
+    const sIntCats = Object.keys(catIntMap).sort((a,b) => catIntMap[b].views - catIntMap[a].views).slice(0, 10);
+    dc('chart-interactions-category', {
+        type: 'bar',
+        data: {
+            labels: sIntCats,
+            datasets: [
+                { label: 'Product Views', data: sIntCats.map(c => catIntMap[c].views), backgroundColor: '#38bdf8' },
+                { label: 'Add to Cart', data: sIntCats.map(c => catIntMap[c].adds), backgroundColor: '#818cf8' },
+                { label: 'List Clicks', data: sIntCats.map(c => catIntMap[c].clicks), backgroundColor: '#fcd34d' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: gridColor } } }
+        }
     });
 
     const top10 = [...State.merged].filter(b=>b.revenue>0).sort((a,b)=>b.revenue-a.revenue).slice(0,10);
