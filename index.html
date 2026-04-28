@@ -26,7 +26,11 @@
             <ul class="nav-links">
                 <li class="nav-item active" data-tab="home">
                     <i data-lucide="home"></i>
-                    <span>Dashboard Home</span>
+                    <span>Home</span>
+                </li>
+                <li class="nav-item disabled" data-tab="blogs">
+                    <i data-lucide="list"></i>
+                    <span>Blog List</span>
                 </li>
                 <li class="nav-item disabled" data-tab="date">
                     <i data-lucide="calendar"></i>
@@ -53,14 +57,14 @@
             <header class="top-header">
                 <div>
                     <h1 id="page-title">Blog Performance Hub</h1>
-                    <p id="page-subtitle">Upload your Search Console data to begin correlation analysis.</p>
+                    <p id="page-subtitle">Upload your Search Console data to begin.</p>
                 </div>
                 <div class="actions" style="display: flex; gap: 10px; align-items: center;">
                     <button class="theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
                         <i data-lucide="sun"></i>
                     </button>
                     <button class="btn btn-primary" id="trigger-upload" onclick="document.getElementById('csv-file').click()">
-                        <i data-lucide="upload"></i> Upload GSC CSV
+                        <i data-lucide="upload"></i> Upload CSV
                     </button>
                     <button class="btn" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main);" onclick="clearAllData()">
                         <i data-lucide="trash-2"></i> Clear
@@ -74,15 +78,15 @@
                 <section id="tab-home" class="tab-pane active">
                     <div class="card instructions-card">
                         <h3><i data-lucide="info"></i> How to Generate Your CSV Data</h3>
-                        <p>To use this dashboard, you need to provide a Google Search Console CSV export.</p>
+                        <p>To use this dashboard, you need a Google Search Console CSV export.</p>
                         <ol>
                             <li>Log in to <strong>Google Search Console</strong>.</li>
-                            <li>Go to the <strong>Performance</strong> > <strong>Search results</strong> report.</li>
-                            <li>Ensure you have the Dates set to a meaningful range (e.g., Last 3 Months).</li>
-                            <li>Switch the view to the <strong>Pages</strong> tab below the chart.</li>
-                            <li>Click the <strong>Export</strong> button (top right) and select <strong>Download CSV</strong>.</li>
-                            <li>Extract the ZIP and locate the <strong>Pages.csv</strong> file.</li>
-                            <li>Upload that file here using the button in the top right.</li>
+                            <li>Go to <strong>Performance</strong> > <strong>Search results</strong>.</li>
+                            <li>Set the date range (e.g., Last 3 Months).</li>
+                            <li>Switch to the <strong>Pages</strong> tab below the chart.</li>
+                            <li>Click <strong>Export</strong> > <strong>Download CSV</strong>.</li>
+                            <li>Extract the ZIP and locate <strong>Pages.csv</strong>.</li>
+                            <li>Upload that file using the button above.</li>
                         </ol>
                     </div>
 
@@ -92,14 +96,54 @@
                         <p>or click the upload button above.</p>
                     </div>
                     
+                    <!-- STAGING AREA (shown after CSV is parsed) -->
+                    <div id="staging-area" class="hidden card">
+                        <h3><i data-lucide="layers"></i> CSV Staging Area</h3>
+                        <p id="staging-summary"></p>
+                        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+                            <label for="row-count" style="color: var(--text-muted);">Rows to process:</label>
+                            <input type="number" id="row-count" min="1" value="10" style="width: 80px; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--card-border); background: var(--bg-main); color: var(--text-main); font-size: 1rem;">
+                            <span id="row-max-label" style="color: var(--text-muted); font-size: 0.85rem;"></span>
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 1.25rem;" onclick="startProcessing()">
+                            <i data-lucide="play"></i> Start Processing
+                        </button>
+                    </div>
+
+                    <!-- PROCESSING VIEW -->
                     <div id="processing-view" class="hidden card processing-card">
                         <div class="loader"></div>
                         <h3>Analyzing URLs</h3>
-                        <p>We are scraping the blogs found in your CSV to extract word count, headings, images, and publish dates.</p>
+                        <p>Scraping blogs for word count, headings, images, and publish dates.</p>
                         <div class="progress-bar">
                             <div class="progress-fill" id="crawl-progress"></div>
                         </div>
                         <p id="progress-text">0 / 0 URLs Processed</p>
+                    </div>
+                </section>
+
+                <!-- BLOG LIST TAB -->
+                <section id="tab-blogs" class="tab-pane">
+                    <div class="card table-card" style="overflow-x: auto;">
+                        <h3><i data-lucide="list"></i> Blog Processing Status</h3>
+                        <table id="blog-list-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>URL</th>
+                                    <th>Clicks</th>
+                                    <th>Impressions</th>
+                                    <th>Words</th>
+                                    <th>Headings</th>
+                                    <th>Images</th>
+                                    <th>Elements</th>
+                                    <th>Category</th>
+                                    <th>Publish Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="blog-list-body">
+                            </tbody>
+                        </table>
                     </div>
                 </section>
 
@@ -111,9 +155,8 @@
                             <div class="metric-value" id="best-day">-</div>
                         </div>
                         <div class="metric-card">
-                            <h4>Average Time to Rank</h4>
-                            <div class="metric-value">N/A</div>
-                            <div class="metric-subtitle">Requires historical ranking dates</div>
+                            <h4>Total Blogs Analyzed</h4>
+                            <div class="metric-value" id="total-blogs-count">0</div>
                         </div>
                     </div>
                     
@@ -145,9 +188,7 @@
                                     <th>Avg Impressions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <!-- Handled by JS -->
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </section>

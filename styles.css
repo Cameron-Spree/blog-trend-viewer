@@ -375,10 +375,21 @@ th {
     font-size: 0.875rem;
     font-weight: 500;
     background: rgba(255, 255, 255, 0.02);
+    white-space: nowrap;
 }
 
 td {
     color: var(--text-main);
+    font-size: 0.875rem;
+}
+
+#blog-list-table td, #blog-list-table th {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+#blog-list-table tr:hover {
+    background: rgba(99, 102, 241, 0.05);
 }
 
 /* Utilities */
