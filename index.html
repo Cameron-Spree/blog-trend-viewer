@@ -42,6 +42,9 @@
                 <li class="nav-item disabled" data-tab="position">
                     <i data-lucide="target"></i><span>Position Analysis</span>
                 </li>
+                <li class="nav-item disabled" data-tab="alerts">
+                    <i data-lucide="bell"></i><span>Action Alerts</span>
+                </li>
             </ul>
             <div class="status-panel">
                 <div class="status-indicator"></div>
@@ -101,16 +104,16 @@
                 <!-- HOME TAB -->
                 <section id="tab-home" class="tab-pane active">
                     <div class="card instructions-card">
-                        <h3><i data-lucide="info"></i> Upload Your 3 CSV Files</h3>
+                        <h3><i data-lucide="info"></i> Upload Your 4 CSV Files</h3>
                         <p>Upload the following files. They will be merged automatically by URL.</p>
                     </div>
 
-                    <div class="upload-grid">
+                    <div class="upload-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                         <!-- 1. GSC CSV -->
                         <div class="upload-card card" id="upload-gsc">
                             <div class="upload-icon"><i data-lucide="search"></i></div>
                             <h4>Search Console CSV</h4>
-                            <p>Pages export with URL, Clicks, Impressions, CTR, Position</p>
+                            <p>URL, Clicks, Impressions, CTR, Position</p>
                             <div class="upload-status" id="gsc-status">Not uploaded</div>
                             <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-gsc').click()">
                                 <i data-lucide="upload"></i> Upload
@@ -134,12 +137,24 @@
                         <div class="upload-card card" id="upload-meta">
                             <div class="upload-icon"><i data-lucide="tag"></i></div>
                             <h4>Blog Metadata CSV</h4>
-                            <p>Title, Status, Url Key, Author, Categories, Published At</p>
+                            <p>Title, Status, Url Key, Categories, Published At</p>
                             <div class="upload-status" id="meta-status">Not uploaded</div>
                             <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-meta').click()">
                                 <i data-lucide="upload"></i> Upload
                             </button>
                             <input type="file" id="file-meta" accept=".csv" style="display:none;" />
+                        </div>
+
+                        <!-- 4. GA4 CSV -->
+                        <div class="upload-card card" id="upload-ga4">
+                            <div class="upload-icon"><i data-lucide="pie-chart"></i></div>
+                            <h4>Google Analytics 4</h4>
+                            <p>URL, Engagement, Conversions, Revenue</p>
+                            <div class="upload-status" id="ga4-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-ga4').click()">
+                                <i data-lucide="upload"></i> Upload
+                            </button>
+                            <input type="file" id="file-ga4" accept=".csv" style="display:none;" />
                         </div>
                     </div>
 
@@ -291,6 +306,66 @@
                         <div class="chart-container card half">
                             <h3>Position vs Category</h3>
                             <canvas id="chart-position-category"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ACTION ALERTS TAB -->
+                <section id="tab-alerts" class="tab-pane">
+                    
+                    <!-- 1. Striking Distance -->
+                    <div class="card table-card mb-4" style="border-left: 4px solid var(--success);">
+                        <div style="padding: 1.5rem; padding-bottom: 0;">
+                            <h3 style="color: var(--success);"><i data-lucide="zap"></i> Striking Distance Targets</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Blogs sitting on Page 2 (Positions 11-20) with above-average impressions. <strong>Action:</strong> Adding 300 words, more images, or updating the publish date can easily push these to Page 1.</p>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1.5rem;">
+                            <table id="alert-striking-dist">
+                                <thead><tr><th>Title</th><th>Position</th><th>Impressions</th><th>Clicks</th><th>Words</th><th>Age (Days)</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 2. Content Decay -->
+                    <div class="card table-card mb-4" style="border-left: 4px solid var(--danger);">
+                        <div style="padding: 1.5rem; padding-bottom: 0;">
+                            <h3 style="color: var(--danger);"><i data-lucide="trending-down"></i> Content Decay Warning</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Older blogs (>365 days) that have fallen below your site's average clicks. <strong>Action:</strong> Refresh content, add internal links to relevant products, and republish with a new date.</p>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1.5rem;">
+                            <table id="alert-content-decay">
+                                <thead><tr><th>Title</th><th>Age (Days)</th><th>Clicks</th><th>Impressions</th><th>Avg Time (s)</th><th>Internal Links</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 3. CTR Underperformer -->
+                    <div class="card table-card mb-4" style="border-left: 4px solid var(--warning);">
+                        <div style="padding: 1.5rem; padding-bottom: 0;">
+                            <h3 style="color: var(--warning);"><i data-lucide="alert-circle"></i> CTR Underperformers</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Blogs with high visibility (impressions above average) but a Click-Through Rate below average. <strong>Action:</strong> These rank well but fail to capture attention. Rewrite the Meta Titles and Meta Descriptions immediately.</p>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1.5rem;">
+                            <table id="alert-ctr-underperf">
+                                <thead><tr><th>Title</th><th>Impressions</th><th>CTR</th><th>Site Avg CTR</th><th>Position</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4. Thin Content -->
+                    <div class="card table-card mb-4" style="border-left: 4px solid var(--accent);">
+                        <div style="padding: 1.5rem; padding-bottom: 0;">
+                            <h3 style="color: var(--accent);"><i data-lucide="file-minus"></i> Thin Content Flag</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Vastly underperforming blogs where the word count falls significantly below your "Elite" Top 10% baseline. <strong>Action:</strong> Expand these into comprehensive guides or merge/redirect them.</p>
+                        </div>
+                        <div style="overflow-x: auto; padding: 1.5rem;">
+                            <table id="alert-thin-content">
+                                <thead><tr><th>Title</th><th>Word Count</th><th>Elite Target Words</th><th>Clicks</th><th>Engagement Rate</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </section>

@@ -5,6 +5,7 @@ const State = {
     gscData: null,
     contentData: null,
     metaData: null,
+    ga4Data: null,
     merged: [],
     charts: {},
     analysisObj: null,
@@ -116,6 +117,7 @@ function setupFileInputs() {
     setupSingleInput('file-gsc', 'gsc');
     setupSingleInput('file-content', 'content');
     setupSingleInput('file-meta', 'meta');
+    setupSingleInput('file-ga4', 'ga4');
 }
 
 function setupSingleInput(inputId, dataType) {
@@ -143,12 +145,13 @@ function setupSingleInput(inputId, dataType) {
 function handleParsedCSV(type, data) {
     if (!data || data.length === 0) return;
 
-    const statusEl = document.getElementById(`${type === 'gsc' ? 'gsc' : type === 'content' ? 'content' : 'meta'}-status`);
+    const statusEl = document.getElementById(`${type === 'gsc' ? 'gsc' : type === 'content' ? 'content' : type === 'meta' ? 'meta' : 'ga4'}-status`);
     const cardEl = document.getElementById(`upload-${type === 'gsc' ? 'gsc' : type}`);
 
     if (type === 'gsc') State.gscData = data;
     else if (type === 'content') State.contentData = data;
     else if (type === 'meta') State.metaData = data;
+    else if (type === 'ga4') State.ga4Data = data;
 
     statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
     cardEl.style.borderColor = 'var(--success)';
@@ -206,7 +209,13 @@ function mergeAndAnalyze() {
                 title: '',
                 author: '',
                 category: 'Uncategorized',
-                publishDate: null
+                publishDate: null,
+                engagementRate: 0,
+                avgTime: 0,
+                conversions: 0,
+                revenue: 0,
+                internalLinks: 0,
+                ageInDays: 0
             };
         });
 
@@ -217,6 +226,7 @@ function mergeAndAnalyze() {
             const cWordKey = cKeys.find(k => k.toLowerCase().includes('word'));
             const cHeadKey = cKeys.find(k => k.toLowerCase().includes('heading'));
             const cImgKey = cKeys.find(k => k.toLowerCase().includes('image'));
+            const cLinkKey = cKeys.find(k => k.toLowerCase().includes('link') || k.toLowerCase().includes('internal'));
             
             if (cUrlKey) {
                 State.contentData.forEach(row => {
@@ -225,6 +235,7 @@ function mergeAndAnalyze() {
                         if (cWordKey) blogMap[url].wordCount = Number(row[cWordKey]) || 0;
                         if (cHeadKey) blogMap[url].headingCount = Number(row[cHeadKey]) || 0;
                         if (cImgKey) blogMap[url].imageCount = Number(row[cImgKey]) || 0;
+                        if (cLinkKey) blogMap[url].internalLinks = Number(row[cLinkKey]) || 0;
                     }
                 });
             }
@@ -259,7 +270,54 @@ function mergeAndAnalyze() {
                         if (mCatKey) blog.category = row[mCatKey] || 'Uncategorized';
                         if (mDateKey && row[mDateKey]) {
                             const d = new Date(row[mDateKey]);
-                            if (!isNaN(d.getTime())) blog.publishDate = d;
+                            if (!isNaN(d.getTime())) {
+                                blog.publishDate = d;
+                                const diffTime = Math.abs(new Date() - d);
+                                blog.ageInDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // GA4 Merge
+        if (State.ga4Data && State.ga4Data.length > 0) {
+            const g4Keys = Object.keys(State.ga4Data[0]);
+            const g4UrlKey = g4Keys.find(k => k.toLowerCase().includes('page') || k.toLowerCase().includes('url') || k.toLowerCase().includes('path'));
+            const engKey = g4Keys.find(k => k.toLowerCase().includes('engagement rate'));
+            const timeKey = g4Keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('duration'));
+            const convKey = g4Keys.find(k => k.toLowerCase().includes('conversion'));
+            const revKey = g4Keys.find(k => k.toLowerCase().includes('revenue'));
+
+            if (g4UrlKey) {
+                State.ga4Data.forEach(row => {
+                    let path = (row[g4UrlKey] || '').toString().trim();
+                    const slug = path.split('/').filter(Boolean).pop();
+                    if (!slug) return;
+
+                    const matchingUrl = Object.keys(blogMap).find(url => {
+                        const urlSlug = url.split('/').filter(Boolean).pop();
+                        return urlSlug === slug;
+                    });
+
+                    if (matchingUrl) {
+                        const blog = blogMap[matchingUrl];
+                        if (engKey) {
+                           let eng = row[engKey] || 0;
+                           if (typeof eng === "string") eng = parseFloat(eng.replace("%", ""));
+                           blog.engagementRate = eng || 0;
+                        }
+                        if (timeKey) blog.avgTime = Number(row[timeKey]) || 0;
+                        if (convKey) {
+                            let conv = row[convKey] || 0;
+                            if (typeof conv === 'string') conv = parseFloat(conv.replace(/[^0-9.-]+/g,""));
+                            blog.conversions = conv || 0;
+                        }
+                        if (revKey) {
+                           let rev = row[revKey] || 0;
+                           if (typeof rev === "string") rev = parseFloat(rev.replace(/[^0-9.-]+/g,""));
+                           blog.revenue = rev || 0;
                         }
                     }
                 });
@@ -387,7 +445,7 @@ function renderBlogList() {
 
 function exportData() {
     if(!State.merged.length) return alert('No data to export');
-    const cols = ['title', 'url', 'clicks', 'impressions', 'ctr', 'position', 'wordCount', 'headingCount', 'imageCount', 'category', 'publishDate'];
+    const cols = ['title', 'url', 'clicks', 'impressions', 'ctr', 'position', 'wordCount', 'headingCount', 'imageCount', 'internalLinks', 'category', 'publishDate', 'ageInDays', 'engagementRate', 'avgTime', 'conversions', 'revenue'];
     const csvRows = [];
     csvRows.push(cols.join(','));
     State.merged.forEach(b => {
@@ -498,6 +556,7 @@ function analyzeData() {
     };
 
     buildAllCharts();
+    buildActionAlerts();
 }
 
 function buildAllCharts() {
@@ -506,6 +565,85 @@ function buildAllCharts() {
     buildContentCharts();
     buildCtrCharts();
     buildPositionCharts();
+}
+
+function buildActionAlerts() {
+    if (!State.merged || State.merged.length === 0) return;
+
+    let tClicks = 0, tImp = 0, tCtrSum = 0, tWords = 0, cCount = 0;
+    
+    // Sort array by clicks descending to find top 10% parameters
+    const sortedByClicks = [...State.merged].sort((a,b) => b.clicks - a.clicks);
+    const top10PercentCount = Math.max(1, Math.floor(sortedByClicks.length * 0.1));
+    const top10PercentBlogs = sortedByClicks.slice(0, top10PercentCount);
+    // Calc elite word count average (exclude 0)
+    const validElite = top10PercentBlogs.filter(b => b.wordCount > 0);
+    const eliteWcAvg = validElite.length ? (validElite.reduce((acc, b) => acc + b.wordCount, 0) / validElite.length) : 0;
+
+    State.merged.forEach(b => {
+        tClicks += b.clicks;
+        tImp += b.impressions;
+        tCtrSum += b.ctr;
+        if(b.wordCount > 0) { tWords += b.wordCount; cCount++; }
+    });
+
+    const globalAvgClicks = tClicks / State.merged.length;
+    const globalAvgImp = tImp / State.merged.length;
+    const globalAvgCtr = tCtrSum / State.merged.length;
+    
+    // 1. Striking Distance Matrix (Positions 11-20, impressions > avg)
+    const striking = State.merged.filter(b => b.position >= 11 && b.position <= 20 && b.impressions > globalAvgImp);
+    const tbody1 = document.querySelector('#alert-striking-dist tbody');
+    if(tbody1) {
+        tbody1.innerHTML = striking.sort((a,b) => b.impressions - a.impressions).map(b => `<tr>
+            <td title="${b.url}">${b.title || ('...'+b.url.slice(-30))}</td>
+            <td>${b.position.toFixed(1)}</td>
+            <td>${b.impressions.toLocaleString()}</td>
+            <td>${b.clicks.toLocaleString()}</td>
+            <td>${b.wordCount || '-'}</td>
+            <td>${b.ageInDays || '-'}</td>
+        </tr>`).join('');
+    }
+
+    // 2. Content Decay (Age > 365 days and clicks < global avg)
+    const decay = State.merged.filter(b => b.ageInDays > 365 && b.clicks < globalAvgClicks);
+    const tbody2 = document.querySelector('#alert-content-decay tbody');
+    if(tbody2) {
+        tbody2.innerHTML = decay.sort((a,b) => b.ageInDays - a.ageInDays).map(b => `<tr>
+            <td title="${b.url}">${b.title || ('...'+b.url.slice(-30))}</td>
+            <td>${b.ageInDays}</td>
+            <td>${b.clicks.toLocaleString()}</td>
+            <td>${b.impressions.toLocaleString()}</td>
+            <td>${b.avgTime ? b.avgTime.toFixed(1) : '-'}</td>
+            <td>${b.internalLinks || 0}</td>
+        </tr>`).join('');
+    }
+
+    // 3. CTR Underperformer (Impressions > avg, CTR < avg)
+    const ctrUnd = State.merged.filter(b => b.impressions > globalAvgImp && b.ctr < globalAvgCtr);
+    const tbody3 = document.querySelector('#alert-ctr-underperf tbody');
+    if(tbody3) {
+        tbody3.innerHTML = ctrUnd.sort((a,b) => a.ctr - b.ctr).map(b => `<tr>
+            <td title="${b.url}">${b.title || ('...'+b.url.slice(-30))}</td>
+            <td>${b.impressions.toLocaleString()}</td>
+            <td style="color:var(--danger)">${b.ctr.toFixed(2)}%</td>
+            <td style="color:var(--text-muted)">${globalAvgCtr.toFixed(2)}%</td>
+            <td>${b.position.toFixed(1)}</td>
+        </tr>`).join('');
+    }
+
+    // 4. Thin Content (WordCount < 50% of Elite average, Clicks < avg)
+    const thin = State.merged.filter(b => b.wordCount > 0 && b.wordCount < (eliteWcAvg * 0.5) && b.clicks < globalAvgClicks);
+    const tbody4 = document.querySelector('#alert-thin-content tbody');
+    if(tbody4) {
+        tbody4.innerHTML = thin.sort((a,b) => a.wordCount - b.wordCount).map(b => `<tr>
+            <td title="${b.url}">${b.title || ('...'+b.url.slice(-30))}</td>
+            <td style="color:var(--danger)">${b.wordCount}</td>
+            <td style="color:var(--text-muted)">~${Math.round(eliteWcAvg)}</td>
+            <td>${b.clicks.toLocaleString()}</td>
+            <td>${b.engagementRate ? b.engagementRate.toFixed(1)+'%' : '-'}</td>
+        </tr>`).join('');
+    }
 }
 
 // Chart.js helper for multi-axis support
