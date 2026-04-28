@@ -486,3 +486,108 @@ td {
     70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
     100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
 }
+
+/* Global Metrics */
+#global-metrics {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--card-border);
+    margin: -1.5rem -2rem 1.5rem -2rem;
+}
+.metric-toggle {
+    flex: 1;
+    min-width: 150px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+.metric-toggle:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.metric-toggle.active {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--primary);
+}
+.metric-toggle[data-metric="impressions"].active {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: var(--success);
+}
+.metric-toggle[data-metric="ctr"].active {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: var(--accent);
+}
+.metric-toggle[data-metric="position"].active {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--warning);
+}
+
+.toggle-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-muted);
+    border-radius: 4px;
+    position: relative;
+}
+.metric-toggle.active .toggle-checkbox {
+    border-color: inherit;
+    background-color: currentColor;
+}
+.metric-toggle[data-metric="clicks"] .toggle-checkbox { color: var(--primary); }
+.metric-toggle[data-metric="impressions"] .toggle-checkbox { color: var(--success); }
+.metric-toggle[data-metric="ctr"] .toggle-checkbox { color: var(--accent); }
+.metric-toggle[data-metric="position"] .toggle-checkbox { color: var(--warning); }
+.metric-toggle.active .toggle-checkbox::after {
+    content: "✓";
+    position: absolute;
+    top: -2px; left: 3px;
+    color: white;
+    font-size: 14px;
+}
+
+.toggle-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.toggle-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.metric-toggle.active[data-metric="clicks"] .toggle-value { color: var(--primary); }
+.metric-toggle.active[data-metric="impressions"] .toggle-value { color: var(--success); }
+.metric-toggle.active[data-metric="ctr"] .toggle-value { color: var(--accent); }
+.metric-toggle.active[data-metric="position"] .toggle-value { color: var(--warning); }
+
+
+/* Sortable Headers */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+th.sortable:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+th.sortable .sort-icon {
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    vertical-align: middle;
+    opacity: 0.3;
+}
+th.sortable.active .sort-icon {
+    opacity: 1;
+    color: var(--primary);
+}

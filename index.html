@@ -36,6 +36,12 @@
                 <li class="nav-item disabled" data-tab="content">
                     <i data-lucide="file-text"></i><span>Content Analysis</span>
                 </li>
+                <li class="nav-item disabled" data-tab="ctr">
+                    <i data-lucide="mouse-pointer"></i><span>CTR Analysis</span>
+                </li>
+                <li class="nav-item disabled" data-tab="position">
+                    <i data-lucide="target"></i><span>Position Analysis</span>
+                </li>
             </ul>
             <div class="status-panel">
                 <div class="status-indicator"></div>
@@ -58,6 +64,38 @@
                     </button>
                 </div>
             </header>
+
+            <!-- Global Metric Toggles (GSC Style) -->
+            <div id="global-metrics" class="hidden">
+                <div class="metric-toggle active" data-metric="clicks" onclick="toggleMetric('clicks')">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Total Clicks</span>
+                        <div class="toggle-value" id="global-clicks">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="impressions" onclick="toggleMetric('impressions')">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Total Impressions</span>
+                        <div class="toggle-value" id="global-impressions">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="ctr" onclick="toggleMetric('ctr')">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Average CTR</span>
+                        <div class="toggle-value" id="global-ctr">-</div>
+                    </div>
+                </div>
+                <div class="metric-toggle" data-metric="position" onclick="toggleMetric('position')">
+                    <div class="toggle-checkbox"></div>
+                    <div>
+                        <span class="toggle-label">Average Position</span>
+                        <div class="toggle-value" id="global-position">-</div>
+                    </div>
+                </div>
+            </div>
 
             <div class="tab-content-container">
                 <!-- HOME TAB -->
@@ -116,22 +154,29 @@
                 <!-- BLOG LIST TAB -->
                 <section id="tab-blogs" class="tab-pane">
                     <div class="card table-card" style="overflow-x: auto;">
-                        <h3><i data-lucide="list"></i> All Blogs</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h3><i data-lucide="list"></i> All Blogs</h3>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="blog-search" placeholder="Search Title or URL..." class="form-input" style="padding: 0.5rem; border-radius: 6px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); min-width: 250px;">
+                                <button class="btn btn-primary btn-sm" onclick="exportData()"><i data-lucide="download"></i> Export Data</button>
+                            </div>
+                        </div>
                         <table id="blog-list-table">
                             <thead>
                                 <tr>
-                                    <th>Title</th>
-                                    <th>URL</th>
-                                    <th>Clicks</th>
-                                    <th>Impr.</th>
-                                    <th>CTR</th>
-                                    <th>Position</th>
-                                    <th>Words</th>
-                                    <th>Headings</th>
-                                    <th>Images</th>
-                                    <th>Author</th>
-                                    <th>Category</th>
-                                    <th>Published</th>
+                                    <th class="sortable" data-sort="title">Title <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="url">URL <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="clicks">Clicks <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="impressions">Impr. <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="ctr">CTR <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="position">Position <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="wordCount">Words <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="headingCount">Headings <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="imageCount">Images <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="author">Author <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="category">Category <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th class="sortable" data-sort="publishDate">Published <i data-lucide="arrow-down-up" class="sort-icon"></i></th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="blog-list-body"></tbody>
@@ -147,16 +192,26 @@
                             <div class="metric-value" id="best-day">-</div>
                         </div>
                         <div class="metric-card">
+                            <h4>Best Time of Day</h4>
+                            <div class="metric-value" id="best-time">-</div>
+                        </div>
+                        <div class="metric-card">
                             <h4>Total Blogs</h4>
                             <div class="metric-value" id="total-blogs-count">0</div>
                         </div>
                     </div>
-                    <div class="chart-container card">
-                        <h3>Avg Clicks by Day of the Week (Published)</h3>
-                        <canvas id="chart-day-of-week"></canvas>
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>Performance by Day of Week</h3>
+                            <canvas id="chart-day-of-week"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Performance by Time of Day</h3>
+                            <canvas id="chart-time-of-day"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-container card">
-                        <h3>Clicks vs Publish Date</h3>
+                    <div class="chart-container card mt-4">
+                        <h3>Performance vs Publish Date</h3>
                         <canvas id="chart-publish-date"></canvas>
                     </div>
                 </section>
@@ -164,13 +219,13 @@
                 <!-- CATEGORY TAB -->
                 <section id="tab-category" class="tab-pane">
                     <div class="chart-container card">
-                        <h3>Traffic by Category</h3>
+                        <h3>Performance by Category</h3>
                         <canvas id="chart-categories"></canvas>
                     </div>
                     <div class="card mt-4 table-card">
                         <h3>Category Breakdown</h3>
                         <table id="category-table">
-                            <thead><tr><th>Category</th><th>Posts</th><th>Avg Clicks</th><th>Avg Impressions</th></tr></thead>
+                            <thead><tr><th>Category</th><th>Posts</th><th>Avg Clicks</th><th>Avg Impressions</th><th>Avg CTR</th><th>Avg Pos</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -190,17 +245,53 @@
                     </div>
                     <div class="chart-row">
                         <div class="chart-container card half">
-                            <h3>Word Count vs Clicks</h3>
+                            <h3>Word Count Analysis</h3>
                             <canvas id="chart-wordcount"></canvas>
                         </div>
                         <div class="chart-container card half">
-                            <h3>Image Count vs Clicks</h3>
+                            <h3>Image Count Analysis</h3>
                             <canvas id="chart-images"></canvas>
                         </div>
                     </div>
                     <div class="chart-container card mt-4">
-                        <h3>Headings vs Performance</h3>
+                        <h3>Heading Count Analysis</h3>
                         <canvas id="chart-headings"></canvas>
+                    </div>
+                </section>
+
+                <!-- CTR TAB -->
+                <section id="tab-ctr" class="tab-pane">
+                    <div class="chart-container card">
+                        <h3>CTR Distribution across Content</h3>
+                        <canvas id="chart-ctr-distribution"></canvas>
+                    </div>
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>CTR vs Word Count</h3>
+                            <canvas id="chart-ctr-wordcount"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>CTR vs Position</h3>
+                            <canvas id="chart-ctr-position"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- POSITION TAB -->
+                <section id="tab-position" class="tab-pane">
+                    <div class="chart-container card">
+                        <h3>Position Distribution across Content</h3>
+                        <canvas id="chart-position-distribution"></canvas>
+                    </div>
+                    <div class="chart-row mt-4">
+                        <div class="chart-container card half">
+                            <h3>Position vs Word Count</h3>
+                            <canvas id="chart-position-wordcount"></canvas>
+                        </div>
+                        <div class="chart-container card half">
+                            <h3>Position vs Category</h3>
+                            <canvas id="chart-position-category"></canvas>
+                        </div>
                     </div>
                 </section>
             </div>

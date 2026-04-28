@@ -2,12 +2,29 @@
 // STATE
 // ============================================================
 const State = {
-    gscData: null,      // Array from GSC CSV
-    contentData: null,  // Array from Content Metrics CSV
-    metaData: null,     // Array from Metadata CSV
-    merged: [],         // Combined dataset
+    gscData: null,
+    contentData: null,
+    metaData: null,
+    merged: [],
     charts: {},
-    analysisObj: null
+    analysisObj: null,
+    activeMetrics: ['clicks'],
+    sortConfig: { column: 'clicks', asc: false },
+    searchQuery: ''
+};
+
+const metricPalette = {
+    clicks: '#6366f1',
+    impressions: '#10b981',
+    ctr: '#38bdf8',
+    position: '#f59e0b'
+};
+
+const metricLabels = {
+    clicks: 'Clicks',
+    impressions: 'Impressions',
+    ctr: 'CTR',
+    position: 'Position'
 };
 
 // ============================================================
@@ -19,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupThemeToggle();
     setupFileInputs();
+    setupTableControls();
 });
 
 // ============================================================
@@ -46,11 +64,11 @@ function updateThemeIcon(theme) {
     const icon = document.querySelector('#theme-toggle i');
     if (!icon) return;
     icon.setAttribute('data-lucide', theme === 'light' ? 'moon' : 'sun');
-    lucide.createIcons();
+    if(typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // ============================================================
-// TABS
+// TABS & TOGGLES
 // ============================================================
 function setupTabs() {
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -67,11 +85,28 @@ function setupTabs() {
 
 function enableTabs() {
     document.querySelectorAll('.nav-item.disabled').forEach(el => el.classList.remove('disabled'));
+    document.getElementById('global-metrics').classList.remove('hidden');
 }
 
 function updateStatus(text, cls) {
     document.getElementById('status-text').innerText = text;
     document.querySelector('.status-indicator').className = `status-indicator ${cls}`;
+}
+
+function toggleMetric(metric) {
+    if (State.activeMetrics.includes(metric)) {
+        if (State.activeMetrics.length === 1) return; // Prevent un-toggling everything
+        State.activeMetrics = State.activeMetrics.filter(m => m !== metric);
+    } else {
+        State.activeMetrics.push(metric);
+    }
+    
+    document.querySelectorAll('.metric-toggle').forEach(el => {
+        if (State.activeMetrics.includes(el.dataset.metric)) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    if (State.merged.length > 0) buildAllCharts();
 }
 
 // ============================================================
@@ -89,19 +124,15 @@ function setupSingleInput(inputId, dataType) {
     input.addEventListener('change', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
-        console.log(`[FILE] ${dataType}:`, file.name, file.size);
         
         Papa.parse(file, {
             header: true,
             dynamicTyping: true,
             skipEmptyLines: true,
             complete: function(results) {
-                console.log(`[PAPA] ${dataType} parsed:`, results.data.length, 'rows');
-                console.log(`[PAPA] ${dataType} headers:`, Object.keys(results.data[0] || {}));
                 handleParsedCSV(dataType, results.data);
             },
             error: function(err) {
-                console.error(`[PAPA] ${dataType} error:`, err);
                 alert(`Error parsing ${dataType} CSV: ${err.message}`);
             }
         });
@@ -110,35 +141,24 @@ function setupSingleInput(inputId, dataType) {
 }
 
 function handleParsedCSV(type, data) {
-    if (!data || data.length === 0) {
-        alert('CSV appears empty.');
-        return;
-    }
+    if (!data || data.length === 0) return;
 
     const statusEl = document.getElementById(`${type === 'gsc' ? 'gsc' : type === 'content' ? 'content' : 'meta'}-status`);
     const cardEl = document.getElementById(`upload-${type === 'gsc' ? 'gsc' : type}`);
 
-    if (type === 'gsc') {
-        State.gscData = data;
-        statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
-    } else if (type === 'content') {
-        State.contentData = data;
-        statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
-    } else if (type === 'meta') {
-        State.metaData = data;
-        statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
-    }
+    if (type === 'gsc') State.gscData = data;
+    else if (type === 'content') State.contentData = data;
+    else if (type === 'meta') State.metaData = data;
 
+    statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
     cardEl.style.borderColor = 'var(--success)';
     checkReadyToMerge();
 }
 
 function checkReadyToMerge() {
-    // Show merge button as soon as at least the GSC data is loaded
-    const mergeArea = document.getElementById('merge-area');
     if (State.gscData) {
-        mergeArea.classList.remove('hidden');
-        lucide.createIcons();
+        document.getElementById('merge-area').classList.remove('hidden');
+        if(typeof lucide !== 'undefined') lucide.createIcons();
     }
     updateStatus('Data loaded', 'ready');
 }
@@ -148,59 +168,38 @@ function checkReadyToMerge() {
 // ============================================================
 function mergeAndAnalyze() {
     try {
-        console.log('[MERGE] Starting merge...');
-        
         if (!State.gscData) {
             alert('Please upload the Search Console CSV first.');
             return;
         }
 
-        // --- 1. Parse GSC data ---
         const gscKeys = Object.keys(State.gscData[0]);
-        console.log('[MERGE] GSC headers:', gscKeys);
-        
         const urlKey = gscKeys.find(k => k.toLowerCase().includes('page') || k.toLowerCase().includes('url') || k.toLowerCase().includes('key'));
         const clicksKey = gscKeys.find(k => k.toLowerCase().includes('click'));
         const impKey = gscKeys.find(k => k.toLowerCase().includes('impression'));
         const ctrKey = gscKeys.find(k => k.toLowerCase().includes('ctr'));
         const posKey = gscKeys.find(k => k.toLowerCase().includes('position'));
 
-        console.log('[MERGE] Detected columns:', { urlKey, clicksKey, impKey, ctrKey, posKey });
-
         if (!urlKey || !clicksKey) {
-            alert('GSC CSV: cannot find URL or Clicks column.\nHeaders: ' + gscKeys.join(', '));
+            alert('Cannot find URL or Clicks column in GSC CSV.');
             return;
         }
 
-        // Try filtering for /blog/ URLs first
-        let gscRows = State.gscData.filter(row => {
-            const url = row[urlKey];
-            return url && typeof url === 'string' && url.includes('/blog/');
-        });
+        let gscRows = State.gscData.filter(row => row[urlKey] && typeof row[urlKey] === 'string' && row[urlKey].includes('/blog/'));
+        if (gscRows.length === 0) gscRows = State.gscData.filter(row => row[urlKey] && typeof row[urlKey] === 'string');
 
-        // If no /blog/ URLs found, use ALL rows
-        if (gscRows.length === 0) {
-            console.warn('[MERGE] No /blog/ URLs found, using all rows');
-            gscRows = State.gscData.filter(row => row[urlKey] && typeof row[urlKey] === 'string');
-        }
-
-        console.log('[MERGE] GSC rows to process:', gscRows.length);
-
-        if (gscRows.length === 0) {
-            alert('No valid URLs found in the GSC CSV.\nFirst row sample: ' + JSON.stringify(State.gscData[0]));
-            return;
-        }
-
-        // Build base records
         const blogMap = {};
         gscRows.forEach(row => {
             const cleanUrl = row[urlKey].trim().replace(/\/$/, '');
+            let parsedCtr = row[ctrKey] || 0;
+            if (typeof parsedCtr === "string") parsedCtr = parseFloat(parsedCtr.replace("%", ""));
+            
             blogMap[cleanUrl] = {
                 url: cleanUrl,
                 clicks: Number(row[clicksKey]) || 0,
                 impressions: Number(row[impKey]) || 0,
-                ctr: row[ctrKey] || 0,
-                position: row[posKey] || 0,
+                ctr: parsedCtr,
+                position: Number(row[posKey]) || 0,
                 wordCount: 0,
                 headingCount: 0,
                 imageCount: 0,
@@ -211,9 +210,7 @@ function mergeAndAnalyze() {
             };
         });
 
-        console.log('[MERGE] Blog map entries:', Object.keys(blogMap).length);
-
-        // --- 2. Merge Content Metrics ---
+        // Content Merge
         if (State.contentData && State.contentData.length > 0) {
             const cKeys = Object.keys(State.contentData[0]);
             const cUrlKey = cKeys.find(k => k.toLowerCase().includes('url'));
@@ -221,24 +218,19 @@ function mergeAndAnalyze() {
             const cHeadKey = cKeys.find(k => k.toLowerCase().includes('heading'));
             const cImgKey = cKeys.find(k => k.toLowerCase().includes('image'));
             
-            console.log('[MERGE] Content keys:', { cUrlKey, cWordKey, cHeadKey, cImgKey });
-            
             if (cUrlKey) {
-                let matched = 0;
                 State.contentData.forEach(row => {
                     const url = (row[cUrlKey] || '').toString().trim().replace(/\/$/, '');
                     if (blogMap[url]) {
                         if (cWordKey) blogMap[url].wordCount = Number(row[cWordKey]) || 0;
                         if (cHeadKey) blogMap[url].headingCount = Number(row[cHeadKey]) || 0;
                         if (cImgKey) blogMap[url].imageCount = Number(row[cImgKey]) || 0;
-                        matched++;
                     }
                 });
-                console.log('[MERGE] Content matched:', matched, '/', State.contentData.length);
             }
         }
 
-        // --- 3. Merge Metadata (join by Url Key slug) ---
+        // Meta Merge
         if (State.metaData && State.metaData.length > 0) {
             const mKeys = Object.keys(State.metaData[0]);
             const mSlugKey = mKeys.find(k => {
@@ -250,16 +242,11 @@ function mergeAndAnalyze() {
             const mCatKey = mKeys.find(k => k.toLowerCase().includes('categor'));
             const mDateKey = mKeys.find(k => k.toLowerCase().includes('published'));
             
-            console.log('[MERGE] Meta keys:', { mSlugKey, mTitleKey, mAuthorKey, mCatKey, mDateKey });
-            console.log('[MERGE] Meta raw headers:', mKeys);
-            
             if (mSlugKey) {
-                let matched = 0;
                 State.metaData.forEach(row => {
                     const slug = (row[mSlugKey] || '').toString().trim();
                     if (!slug) return;
                     
-                    // Find matching blog by checking if any URL ends with the slug
                     const matchingUrl = Object.keys(blogMap).find(url => {
                         const urlSlug = url.split('/').filter(Boolean).pop();
                         return urlSlug === slug;
@@ -274,106 +261,242 @@ function mergeAndAnalyze() {
                             const d = new Date(row[mDateKey]);
                             if (!isNaN(d.getTime())) blog.publishDate = d;
                         }
-                        matched++;
                     }
                 });
-                console.log('[MERGE] Meta matched:', matched, '/', State.metaData.length);
-            } else {
-                console.warn('[MERGE] Could not find Url Key column in meta CSV. Headers:', mKeys);
             }
         }
 
-        // --- 4. Finalize ---
         State.merged = Object.values(blogMap);
-        console.log('[MERGE] Final dataset:', State.merged.length, 'blogs');
-
         if (State.merged.length === 0) {
-            alert('Merge produced 0 results. Check console (F12) for details.');
+            alert('Merge produced 0 results.');
             return;
         }
 
         enableTabs();
-        renderBlogList();
         analyzeData();
-        updateStatus(`${State.merged.length} blogs merged`, 'ready');
+        renderBlogList();
+        updateStatus(`${State.merged.length} blogs active`, 'ready');
 
-        // Auto-switch to blog list
         document.querySelector('[data-tab="blogs"]').click();
         
     } catch (err) {
-        console.error('[MERGE] CRASH:', err);
-        alert('Merge error: ' + err.message + '\n\nCheck the browser console (F12) for full details.');
+        console.error(err);
+        alert('Merge error: ' + err.message);
     }
 }
 
 // ============================================================
-// BLOG LIST TAB
+// BLOG LIST UI
 // ============================================================
+function setupTableControls() {
+    const searchInput = document.getElementById('blog-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            State.searchQuery = e.target.value.toLowerCase();
+            renderBlogList();
+        });
+    }
+
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (State.sortConfig.column === col) {
+                State.sortConfig.asc = !State.sortConfig.asc;
+            } else {
+                State.sortConfig.column = col;
+                State.sortConfig.asc = false;
+            }
+            // Update UI
+            document.querySelectorAll('.sortable').forEach(el => {
+                el.classList.remove('active');
+                if(el.querySelector('.sort-icon')) el.querySelector('.sort-icon').setAttribute('data-lucide', 'arrow-down-up');
+            });
+            th.classList.add('active');
+            th.querySelector('.sort-icon').setAttribute('data-lucide', State.sortConfig.asc ? 'arrow-up' : 'arrow-down');
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+
+            renderBlogList();
+        });
+    });
+}
+
+function removeBlog(url) {
+    State.merged = State.merged.filter(b => b.url !== url);
+    analyzeData();
+    renderBlogList();
+    updateStatus(`${State.merged.length} blogs active`, 'ready');
+}
+
 function renderBlogList() {
+    let data = [...State.merged];
+    
+    // Filter
+    if (State.searchQuery) {
+        data = data.filter(b => 
+            (b.title && b.title.toLowerCase().includes(State.searchQuery)) || 
+            (b.url && b.url.toLowerCase().includes(State.searchQuery))
+        );
+    }
+
+    // Sort
+    data.sort((a, b) => {
+        let valA = a[State.sortConfig.column];
+        let valB = b[State.sortConfig.column];
+        
+        if (State.sortConfig.column === 'publishDate') {
+            valA = valA ? valA.getTime() : 0;
+            valB = valB ? valB.getTime() : 0;
+        } else if (typeof valA === 'string') {
+            valA = valA.toLowerCase();
+            valB = (valB || '').toLowerCase();
+            return State.sortConfig.asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        
+        valA = valA || 0;
+        valB = valB || 0;
+        return State.sortConfig.asc ? valA - valB : valB - valA;
+    });
+
     const tbody = document.getElementById('blog-list-body');
-    tbody.innerHTML = State.merged
-        .sort((a, b) => b.clicks - a.clicks)
-        .map(b => {
-            const shortUrl = b.url.length > 50 ? '…' + b.url.slice(-45) : b.url;
-            const pubDate = b.publishDate ? b.publishDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
-            return `<tr>
-                <td>${b.title || '-'}</td>
-                <td title="${b.url}" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${shortUrl}</td>
-                <td>${b.clicks}</td>
-                <td>${b.impressions}</td>
-                <td>${b.ctr}</td>
-                <td>${typeof b.position === 'number' ? b.position.toFixed(1) : b.position}</td>
-                <td>${b.wordCount || '-'}</td>
-                <td>${b.headingCount || '-'}</td>
-                <td>${b.imageCount || '-'}</td>
-                <td>${b.author || '-'}</td>
-                <td>${b.category}</td>
-                <td>${pubDate}</td>
-            </tr>`;
-        }).join('');
+    if (!tbody) return;
+
+    tbody.innerHTML = data.map(b => {
+        const shortUrl = b.url.length > 50 ? '…' + b.url.slice(-45) : b.url;
+        const pubDate = b.publishDate ? b.publishDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+        return `<tr>
+            <td>${b.title || '-'}</td>
+            <td title="${b.url}" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${shortUrl}</td>
+            <td>${b.clicks.toLocaleString()}</td>
+            <td>${b.impressions.toLocaleString()}</td>
+            <td>${b.ctr.toFixed(2)}%</td>
+            <td>${Number(b.position).toFixed(1)}</td>
+            <td>${b.wordCount || '-'}</td>
+            <td>${b.headingCount || '-'}</td>
+            <td>${b.imageCount || '-'}</td>
+            <td>${b.author || '-'}</td>
+            <td>${b.category}</td>
+            <td>${pubDate}</td>
+            <td>
+                <button class="btn btn-sm" style="color:var(--danger); border:1px solid var(--danger); background:transparent; padding: 0.25rem 0.5rem;" onclick="removeBlog('${b.url}')">
+                    Remove
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function exportData() {
+    if(!State.merged.length) return alert('No data to export');
+    const cols = ['title', 'url', 'clicks', 'impressions', 'ctr', 'position', 'wordCount', 'headingCount', 'imageCount', 'category', 'publishDate'];
+    const csvRows = [];
+    csvRows.push(cols.join(','));
+    State.merged.forEach(b => {
+        const vals = cols.map(c => {
+            let val = b[c] !== null && b[c] !== undefined ? b[c] : '';
+            if (c === 'publishDate' && val) val = val.toISOString();
+            val = val.toString().replace(/"/g, '""');
+            return `"${val}"`;
+        });
+        csvRows.push(vals.join(','));
+    });
+    
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `blog_trend_export_${new Date().getTime()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
 }
 
 // ============================================================
 // DATA ANALYSIS & CHARTS
 // ============================================================
 function analyzeData() {
-    const isLight = document.documentElement.classList.contains('light-mode');
-    const labelColor = isLight ? '#64748b' : '#9ca3af';
-    const gridColor = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)';
-
+    let tClicks = 0, tImp = 0, tCtrSum = 0, tPosSum = 0;
+    
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayStats = {};
-    for (let i = 0; i < 7; i++) dayStats[i] = { cl: 0, imp: 0, ct: 0 };
+    for (let i = 0; i < 7; i++) dayStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+    
+    const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+    const hourStats = {};
+    for (let i = 0; i < 24; i++) hourStats[i] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+
     const catStats = {};
 
     State.merged.forEach(item => {
+        tClicks += item.clicks;
+        tImp += item.impressions;
+        tCtrSum += item.ctr;
+        tPosSum += item.position;
+
         if (item.publishDate) {
             const d = new Date(item.publishDate);
             if (!isNaN(d.getTime())) {
                 const day = d.getDay();
-                dayStats[day].cl += item.clicks;
-                dayStats[day].imp += item.impressions;
+                dayStats[day].clicks += item.clicks;
+                dayStats[day].impressions += item.impressions;
+                dayStats[day].ctrSum += item.ctr;
+                dayStats[day].posSum += item.position;
                 dayStats[day].ct += 1;
+
+                const hour = d.getHours();
+                hourStats[hour].clicks += item.clicks;
+                hourStats[hour].impressions += item.impressions;
+                hourStats[hour].ctrSum += item.ctr;
+                hourStats[hour].posSum += item.position;
+                hourStats[hour].ct += 1;
             }
         }
-        const cat = item.category || 'Uncategorized';
-        if (!catStats[cat]) catStats[cat] = { cl: 0, imp: 0, ct: 0 };
-        catStats[cat].cl += item.clicks;
-        catStats[cat].imp += item.impressions;
-        catStats[cat].ct += 1;
+        
+        // Category Splitting
+        let cats = (item.category || 'Uncategorized').split(',').map(c => c.trim()).filter(Boolean);
+        if (cats.length === 0) cats.push('Uncategorized');
+        
+        cats.forEach(cat => {
+            if (!catStats[cat]) catStats[cat] = { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 };
+            catStats[cat].clicks += item.clicks;
+            catStats[cat].impressions += item.impressions;
+            catStats[cat].ctrSum += item.ctr;
+            catStats[cat].posSum += item.position;
+            catStats[cat].ct += 1;
+        });
     });
 
-    let bestDay = null, maxAvg = -1;
+    // Globals
+    document.getElementById('global-clicks').innerText = tClicks.toLocaleString();
+    document.getElementById('global-impressions').innerText = tImp.toLocaleString();
+    document.getElementById('global-ctr').innerText = State.merged.length ? (tCtrSum / State.merged.length).toFixed(2) + '%' : '-';
+    document.getElementById('global-position').innerText = State.merged.length ? (tPosSum / State.merged.length).toFixed(1) : '-';
+    document.getElementById('total-blogs-count').innerText = State.merged.length;
+
+    // Bests
+    let bestDay = null, maxAvgD = -1;
     for (let i = 0; i < 7; i++) {
         if (dayStats[i].ct > 0) {
-            const avg = dayStats[i].cl / dayStats[i].ct;
-            if (avg > maxAvg) { maxAvg = avg; bestDay = i; }
+            const avg = dayStats[i].clicks / dayStats[i].ct;
+            if (avg > maxAvgD) { maxAvgD = avg; bestDay = i; }
         }
     }
     if (bestDay !== null) document.getElementById('best-day').innerText = days[bestDay];
-    document.getElementById('total-blogs-count').innerText = State.merged.length;
 
-    State.analysisObj = { days, dayStats, catStats, labelColor, gridColor };
+    let bestHr = null, maxAvgHr = -1;
+    for (let i = 0; i < 24; i++) {
+        if (hourStats[i].ct > 0) {
+            const avg = hourStats[i].clicks / hourStats[i].ct;
+            if (avg > maxAvgHr) { maxAvgHr = avg; bestHr = i; }
+        }
+    }
+    if (bestHr !== null) document.getElementById('best-time').innerText = `${bestHr}:00`;
+
+    const isLight = document.documentElement.classList.contains('light-mode');
+    State.analysisObj = {
+        days, dayStats, hours, hourStats, catStats,
+        labelColor: isLight ? '#64748b' : '#9ca3af',
+        gridColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'
+    };
+
     buildAllCharts();
 }
 
@@ -381,81 +504,184 @@ function buildAllCharts() {
     buildDateCharts();
     buildCategoryCharts();
     buildContentCharts();
+    buildCtrCharts();
+    buildPositionCharts();
+}
+
+// Chart.js helper for multi-axis support
+function getChartConfig(type, labels, dataMaps, xOptions = {}) {
+    const { gridColor } = State.analysisObj;
+    const datasets = [];
+    const scales = { x: { grid: { display:false }, ...xOptions } };
+    
+    let yAxesCount = 0;
+
+    State.activeMetrics.forEach((metric) => {
+        if (!dataMaps[metric]) return;
+        const axisId = yAxesCount === 0 ? 'y' : `y${yAxesCount}`;
+        datasets.push({
+            label: metricLabels[metric],
+            data: dataMaps[metric],
+            backgroundColor: metricPalette[metric],
+            borderColor: metricPalette[metric],
+            borderWidth: type === 'bar' ? 0 : 2,
+            borderRadius: type === 'bar' ? 4 : 0,
+            pointRadius: type === 'scatter' ? 5 : 3,
+            yAxisID: axisId
+        });
+        scales[axisId] = {
+            type: 'linear',
+            display: true,
+            position: yAxesCount === 0 ? 'left' : 'right',
+            grid: { color: yAxesCount === 0 ? gridColor : 'transparent' },
+            beginAtZero: true
+        };
+        // Invert Position axis if it's position since 1 is better than 100
+        if (metric === 'position') scales[axisId].reverse = true;
+        
+        yAxesCount++;
+    });
+
+    return { type, data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false, scales } };
 }
 
 function createChart(id, cfg) {
     if (State.charts[id]) State.charts[id].destroy();
     const canvas = document.getElementById(id);
-    if (!canvas) return;
+    if (!canvas || !cfg.data.datasets.length) return;
     Chart.defaults.color = State.analysisObj.labelColor;
     State.charts[id] = new Chart(canvas.getContext('2d'), cfg);
 }
 
 function buildDateCharts() {
-    const { days, dayStats, gridColor } = State.analysisObj;
-    createChart('chart-day-of-week', {
-        type: 'bar',
-        data: { labels: days, datasets: [{ label: 'Avg Clicks', data: days.map((_, i) => dayStats[i].ct > 0 ? (dayStats[i].cl / dayStats[i].ct).toFixed(1) : 0), backgroundColor: '#6366f1', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: gridColor } }, x: { grid: { display: false } } } }
-    });
+    const { days, dayStats, hours, hourStats } = State.analysisObj;
+    
+    // Day of week
+    const dmDays = {
+        clicks: days.map((_, i) => dayStats[i].ct ? dayStats[i].clicks / dayStats[i].ct : 0),
+        impressions: days.map((_, i) => dayStats[i].ct ? dayStats[i].impressions / dayStats[i].ct : 0),
+        ctr: days.map((_, i) => dayStats[i].ct ? dayStats[i].ctrSum / dayStats[i].ct : 0),
+        position: days.map((_, i) => dayStats[i].ct ? dayStats[i].posSum / dayStats[i].ct : 0)
+    };
+    createChart('chart-day-of-week', getChartConfig('bar', days, dmDays));
 
-    const scatter = State.merged.filter(d => d.publishDate && d.clicks > 0).map(d => ({ x: new Date(d.publishDate), y: d.clicks }));
-    createChart('chart-publish-date', {
-        type: 'scatter',
-        data: { datasets: [{ label: 'Posts', data: scatter, backgroundColor: '#8b5cf6', pointRadius: 5 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' }, grid: { color: gridColor } }, y: { title: { display: true, text: 'Clicks' }, grid: { color: gridColor } } } }
+    // Time of day
+    const dmHours = {
+        clicks: hours.map((_, i) => hourStats[i].ct ? hourStats[i].clicks / hourStats[i].ct : 0),
+        impressions: hours.map((_, i) => hourStats[i].ct ? hourStats[i].impressions / hourStats[i].ct : 0),
+        ctr: hours.map((_, i) => hourStats[i].ct ? hourStats[i].ctrSum / hourStats[i].ct : 0),
+        position: hours.map((_, i) => hourStats[i].ct ? hourStats[i].posSum / hourStats[i].ct : 0)
+    };
+    createChart('chart-time-of-day', getChartConfig('bar', hours, dmHours));
+
+    // Scatter
+    const validTime = State.merged.filter(d => d.publishDate);
+    const dmScatter = {};
+    State.activeMetrics.forEach(m => {
+        dmScatter[m] = validTime.map(d => ({ x: new Date(d.publishDate), y: d[m] }));
     });
+    createChart('chart-publish-date', getChartConfig('scatter', [], dmScatter, { type: 'time', time: { unit: 'month' }, grid: { color: State.analysisObj.gridColor } }));
 }
 
 function buildCategoryCharts() {
-    const { catStats, gridColor } = State.analysisObj;
-    const sorted = Object.keys(catStats)
-        .map(c => ({ name: c, avgCl: (catStats[c].cl / catStats[c].ct).toFixed(1), avgImp: (catStats[c].imp / catStats[c].ct).toFixed(0), total: catStats[c].ct }))
-        .sort((a, b) => b.avgCl - a.avgCl);
-
-    createChart('chart-categories', {
-        type: 'bar',
-        data: { labels: sorted.map(c => c.name), datasets: [{ label: 'Avg Clicks', data: sorted.map(c => c.avgCl), backgroundColor: '#10b981', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: gridColor } }, x: { grid: { display: false } } } }
-    });
+    const { catStats } = State.analysisObj;
+    const sortedCats = Object.keys(catStats).sort((a,b) => catStats[b].clicks - catStats[a].clicks);
+    
+    const dmCats = {
+        clicks: sortedCats.map(c => catStats[c].clicks / catStats[c].ct),
+        impressions: sortedCats.map(c => catStats[c].impressions / catStats[c].ct),
+        ctr: sortedCats.map(c => catStats[c].ctrSum / catStats[c].ct),
+        position: sortedCats.map(c => catStats[c].posSum / catStats[c].ct)
+    };
+    createChart('chart-categories', getChartConfig('bar', sortedCats, dmCats));
 
     const tbody = document.querySelector('#category-table tbody');
-    if (tbody) tbody.innerHTML = sorted.map(c => `<tr><td>${c.name}</td><td>${c.total}</td><td>${c.avgCl}</td><td>${c.avgImp}</td></tr>`).join('');
+    if (tbody) {
+        tbody.innerHTML = sortedCats.map(c => `<tr>
+            <td>${c}</td>
+            <td>${catStats[c].ct}</td>
+            <td>${(catStats[c].clicks / catStats[c].ct).toFixed(1)}</td>
+            <td>${(catStats[c].impressions / catStats[c].ct).toFixed(0)}</td>
+            <td>${(catStats[c].ctrSum / catStats[c].ct).toFixed(2)}%</td>
+            <td>${(catStats[c].posSum / catStats[c].ct).toFixed(1)}</td>
+        </tr>`).join('');
+    }
 }
 
 function buildContentCharts() {
-    const { gridColor } = State.analysisObj;
-    const valid = State.merged.filter(d => d.wordCount > 0);
-
-    createChart('chart-wordcount', {
-        type: 'scatter',
-        data: { datasets: [{ label: 'WC vs Clicks', data: valid.map(d => ({ x: d.wordCount, y: d.clicks })), backgroundColor: '#6366f1', pointRadius: 5 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Word Count' }, grid: { color: gridColor } }, y: { title: { display: true, text: 'Clicks' }, grid: { color: gridColor } } } }
+    const validWc = State.merged.filter(d => d.wordCount > 0);
+    const dmWc = {};
+    const dmImg = {};
+    State.activeMetrics.forEach(m => {
+        dmWc[m] = validWc.map(d => ({ x: d.wordCount, y: d[m] }));
+        dmImg[m] = validWc.map(d => ({ x: d.imageCount, y: d[m] }));
     });
+    createChart('chart-wordcount', getChartConfig('scatter', [], dmWc, { title:{display:true, text:"Word Count"}, grid: {color: State.analysisObj.gridColor} }));
+    createChart('chart-images', getChartConfig('scatter', [], dmImg, { title:{display:true, text:"Images"}, grid: {color: State.analysisObj.gridColor} }));
 
-    createChart('chart-images', {
-        type: 'scatter',
-        data: { datasets: [{ label: 'Images vs Clicks', data: valid.map(d => ({ x: d.imageCount, y: d.clicks })), backgroundColor: '#ef4444', pointRadius: 5 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Images' }, grid: { color: gridColor } }, y: { title: { display: true, text: 'Clicks' }, grid: { color: gridColor } } } }
-    });
-
-    const hg = { '0-5': { cl: 0, ct: 0 }, '6-10': { cl: 0, ct: 0 }, '11-15': { cl: 0, ct: 0 }, '16+': { cl: 0, ct: 0 } };
-    valid.forEach(d => {
+    const hg = { '0-5': { ...catStatsTemplate() }, '6-10': { ...catStatsTemplate() }, '11-15': { ...catStatsTemplate() }, '16+': { ...catStatsTemplate() } };
+    validWc.forEach(d => {
         const k = d.headingCount <= 5 ? '0-5' : d.headingCount <= 10 ? '6-10' : d.headingCount <= 15 ? '11-15' : '16+';
-        hg[k].cl += d.clicks; hg[k].ct += 1;
+        hg[k].clicks += d.clicks; hg[k].impressions += d.impressions; hg[k].ctrSum += d.ctr; hg[k].posSum += d.position; hg[k].ct += 1;
     });
-    createChart('chart-headings', {
-        type: 'bar',
-        data: { labels: Object.keys(hg), datasets: [{ label: 'Avg Clicks', data: Object.keys(hg).map(k => hg[k].ct > 0 ? (hg[k].cl / hg[k].ct).toFixed(1) : 0), backgroundColor: '#38bdf8', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: gridColor } }, x: { grid: { display: false } } } }
+    const lblsHg = Object.keys(hg);
+    const dmHg = {
+        clicks: lblsHg.map(k => hg[k].ct ? hg[k].clicks / hg[k].ct : 0),
+        impressions: lblsHg.map(k => hg[k].ct ? hg[k].impressions / hg[k].ct : 0),
+        ctr: lblsHg.map(k => hg[k].ct ? hg[k].ctrSum / hg[k].ct : 0),
+        position: lblsHg.map(k => hg[k].ct ? hg[k].posSum / hg[k].ct : 0)
+    };
+    createChart('chart-headings', getChartConfig('bar', lblsHg, dmHg));
+}
+
+function buildCtrCharts() {
+    // Histogram of CTR
+    const bins = [0, 1, 2, 3, 5, 10, 20];
+    const dist = bins.map(() => 0);
+    State.merged.forEach(b => {
+        for(let i=1; i<bins.length; i++) {
+            if(b.ctr <= bins[i]) { dist[i-1]++; break; }
+        }
+        if(b.ctr > bins[bins.length-1]) dist[bins.length-1]++; 
+    });
+    const blabels = bins.map((b,i) => i===bins.length-1 ? `${b}%+` : `${b}-${bins[i+1]}%`);
+    createChart('chart-ctr-distribution', {
+        type: 'bar', data: { labels: blabels, datasets: [{ label: 'Number of Blogs', data: dist, backgroundColor: metricPalette.ctr }] },
+        options: { responsive: true, maintainAspectRatio: false, scales:{x:{grid:{display:false}},y:{beginAtZero:true}} }
     });
 
-    const top10 = [...valid].sort((a, b) => b.clicks - a.clicks).slice(0, Math.max(1, Math.floor(valid.length * 0.1)));
-    if (top10.length > 0) {
-        document.getElementById('avg-word-count-top').innerText = Math.round(top10.reduce((a, c) => a + c.wordCount, 0) / top10.length).toLocaleString();
-        document.getElementById('avg-images-top').innerText = Math.round(top10.reduce((a, c) => a + c.imageCount, 0) / top10.length);
-    }
+    // Scatter WC vs CTR
+    const validWc = State.merged.filter(d => d.wordCount > 0);
+    createChart('chart-ctr-wordcount', getChartConfig('scatter', [], {ctr: validWc.map(d=>({x:d.wordCount,y:d.ctr})) }, {title:{display:true, text:"Word Count"}}));
+    
+    // Scatter Pos vs CTR
+    createChart('chart-ctr-position', getChartConfig('scatter', [], {ctr: State.merged.map(d=>({x:d.position,y:d.ctr})) }, {title:{display:true, text:"Average Position"}}));
 }
+
+function buildPositionCharts() {
+    const bins = [1, 3, 5, 10, 20, 50, 100];
+    const dist = bins.map(() => 0);
+    State.merged.forEach(b => {
+        for(let i=1; i<bins.length; i++) {
+            if(b.position <= bins[i]) { dist[i-1]++; break; }
+        }
+        if(b.position > bins[bins.length-1]) dist[bins.length-1]++; 
+    });
+    const blabels = bins.map((b,i) => i===bins.length-1 ? `${b}+` : `${b}-${bins[i+1]}`);
+    createChart('chart-position-distribution', {
+        type: 'bar', data: { labels: blabels, datasets: [{ label: 'Number of Blogs', data: dist, backgroundColor: metricPalette.position }] },
+        options: { responsive: true, maintainAspectRatio: false, scales:{x:{grid:{display:false}},y:{beginAtZero:true}} }
+    });
+
+    const validWc = State.merged.filter(d => d.wordCount > 0);
+    createChart('chart-position-wordcount', getChartConfig('scatter', [], {position: validWc.map(d=>({x:d.wordCount,y:d.position})) }, {title:{display:true, text:"Word Count"}}));
+    
+    const sortedCats = Object.keys(State.analysisObj.catStats).sort((a,b) => State.analysisObj.catStats[b].clicks - State.analysisObj.catStats[a].clicks).slice(0, 10);
+    const dmPos = { position: sortedCats.map(c => State.analysisObj.catStats[c].posSum / State.analysisObj.catStats[c].ct) };
+    createChart('chart-position-category', getChartConfig('bar', sortedCats, dmPos));
+}
+
+function catStatsTemplate() { return { clicks: 0, impressions: 0, ctrSum: 0, posSum: 0, ct: 0 }; }
 
 function renderChartsForTab(tab) {
     setTimeout(() => {
