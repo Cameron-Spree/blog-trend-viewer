@@ -145,19 +145,30 @@
                             <input type="file" id="file-meta" accept=".csv" style="display:none;" />
                         </div>
 
-                        <!-- 4. GA4 CSV -->
-                        <div class="upload-card card" id="upload-ga4">
-                            <div class="upload-icon"><i data-lucide="pie-chart"></i></div>
-                            <h4>Google Analytics 4</h4>
-                            <p>URL, Engagement, Conversions, Revenue</p>
-                            <div class="upload-status" id="ga4-status">Not uploaded</div>
-                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-ga4').click()">
+                        <!-- 4. GA4 Engagement -->
+                        <div class="upload-card card" id="upload-ga4-eng">
+                            <div class="upload-icon"><i data-lucide="bar-chart-2"></i></div>
+                            <h4>GA4 Engagement</h4>
+                            <p>Landing page, Engagement Rate, Time</p>
+                            <div class="upload-status" id="ga4-eng-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-ga4-eng').click()">
                                 <i data-lucide="upload"></i> Upload
                             </button>
-                            <input type="file" id="file-ga4" accept=".csv" style="display:none;" />
+                            <input type="file" id="file-ga4-eng" accept=".csv" style="display:none;" />
+                        </div>
+
+                        <!-- 5. GA4 E-commerce -->
+                        <div class="upload-card card" id="upload-ga4-ecom">
+                            <div class="upload-icon"><i data-lucide="shopping-cart"></i></div>
+                            <h4>GA4 Commerce</h4>
+                            <p>Page Referrer, Revenue, Purchases</p>
+                            <div class="upload-status" id="ga4-ecom-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-ga4-ecom').click()">
+                                <i data-lucide="upload"></i> Upload
+                            </button>
+                            <input type="file" id="file-ga4-ecom" accept=".csv" style="display:none;" />
                         </div>
                     </div>
-
                     <!-- Merge button -->
                     <div id="merge-area" class="hidden" style="text-align: center; margin-top: 1.5rem;">
                         <button class="btn btn-primary btn-lg" onclick="mergeAndAnalyze()">

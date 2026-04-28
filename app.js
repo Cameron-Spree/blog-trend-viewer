@@ -5,7 +5,8 @@ const State = {
     gscData: null,
     contentData: null,
     metaData: null,
-    ga4Data: null,
+    ga4EngData: null,
+    ga4EcomData: null,
     merged: [],
     charts: {},
     analysisObj: null,
@@ -117,7 +118,8 @@ function setupFileInputs() {
     setupSingleInput('file-gsc', 'gsc');
     setupSingleInput('file-content', 'content');
     setupSingleInput('file-meta', 'meta');
-    setupSingleInput('file-ga4', 'ga4');
+    setupSingleInput('file-ga4-eng', 'ga4-eng');
+    setupSingleInput('file-ga4-ecom', 'ga4-ecom');
 }
 
 function setupSingleInput(inputId, dataType) {
@@ -145,16 +147,19 @@ function setupSingleInput(inputId, dataType) {
 function handleParsedCSV(type, data) {
     if (!data || data.length === 0) return;
 
-    const statusEl = document.getElementById(`${type === 'gsc' ? 'gsc' : type === 'content' ? 'content' : type === 'meta' ? 'meta' : 'ga4'}-status`);
-    const cardEl = document.getElementById(`upload-${type === 'gsc' ? 'gsc' : type}`);
+    const baseType = type.startsWith('ga4') ? type : type === 'gsc' ? 'gsc' : type === 'content' ? 'content' : 'meta';
+    
+    const statusEl = document.getElementById(`${baseType}-status`);
+    const cardEl = document.getElementById(`upload-${baseType}`);
 
     if (type === 'gsc') State.gscData = data;
     else if (type === 'content') State.contentData = data;
     else if (type === 'meta') State.metaData = data;
-    else if (type === 'ga4') State.ga4Data = data;
+    else if (type === 'ga4-eng') State.ga4EngData = data;
+    else if (type === 'ga4-ecom') State.ga4EcomData = data;
 
-    statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
-    cardEl.style.borderColor = 'var(--success)';
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--success)">✓ ${data.length} rows loaded</span>`;
+    if (cardEl) cardEl.style.borderColor = 'var(--success)';
     checkReadyToMerge();
 }
 
@@ -281,17 +286,15 @@ function mergeAndAnalyze() {
             }
         }
 
-        // GA4 Merge
-        if (State.ga4Data && State.ga4Data.length > 0) {
-            const g4Keys = Object.keys(State.ga4Data[0]);
+        // GA4 Engagement Merge
+        if (State.ga4EngData && State.ga4EngData.length > 0) {
+            const g4Keys = Object.keys(State.ga4EngData[0]);
             const g4UrlKey = g4Keys.find(k => k.toLowerCase().includes('page') || k.toLowerCase().includes('url') || k.toLowerCase().includes('path'));
             const engKey = g4Keys.find(k => k.toLowerCase().includes('engagement rate'));
             const timeKey = g4Keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('duration'));
-            const convKey = g4Keys.find(k => k.toLowerCase().includes('conversion'));
-            const revKey = g4Keys.find(k => k.toLowerCase().includes('revenue'));
 
             if (g4UrlKey) {
-                State.ga4Data.forEach(row => {
+                State.ga4EngData.forEach(row => {
                     let path = (row[g4UrlKey] || '').toString().trim();
                     const slug = path.split('/').filter(Boolean).pop();
                     if (!slug) return;
@@ -309,15 +312,40 @@ function mergeAndAnalyze() {
                            blog.engagementRate = eng || 0;
                         }
                         if (timeKey) blog.avgTime = Number(row[timeKey]) || 0;
-                        if (convKey) {
-                            let conv = row[convKey] || 0;
-                            if (typeof conv === 'string') conv = parseFloat(conv.replace(/[^0-9.-]+/g,""));
-                            blog.conversions = conv || 0;
+                    }
+                });
+            }
+        }
+
+        // GA4 E-commerce Merge
+        if (State.ga4EcomData && State.ga4EcomData.length > 0) {
+            const g4Keys = Object.keys(State.ga4EcomData[0]);
+            const g4RefKey = g4Keys.find(k => k.toLowerCase().includes('referrer') || k.toLowerCase().includes('page'));
+            const revKey = g4Keys.find(k => k.toLowerCase().includes('revenue'));
+            const purchKey = g4Keys.find(k => k.toLowerCase().includes('purchased') || k.toLowerCase().includes('conversion'));
+
+            if (g4RefKey) {
+                State.ga4EcomData.forEach(row => {
+                    let ref = (row[g4RefKey] || '').toString().trim();
+                    const slug = ref.split('/').filter(Boolean).pop();
+                    if (!slug) return;
+
+                    const matchingUrl = Object.keys(blogMap).find(url => {
+                        const urlSlug = url.split('/').filter(Boolean).pop();
+                        return urlSlug === slug;
+                    });
+
+                    if (matchingUrl) {
+                        const blog = blogMap[matchingUrl];
+                        if (purchKey) {
+                            let purch = row[purchKey] || 0;
+                            if (typeof purch === 'string') purch = parseFloat(purch.replace(/[^0-9.-]+/g,""));
+                            blog.conversions += (purch || 0); // Accumulate if multiple items per referring blog
                         }
                         if (revKey) {
                            let rev = row[revKey] || 0;
                            if (typeof rev === "string") rev = parseFloat(rev.replace(/[^0-9.-]+/g,""));
-                           blog.revenue = rev || 0;
+                           blog.revenue += (rev || 0); // Accumulate item revenue
                         }
                     }
                 });
