@@ -147,127 +147,163 @@ function checkReadyToMerge() {
 // MERGE LOGIC
 // ============================================================
 function mergeAndAnalyze() {
-    console.log('[MERGE] Starting merge...');
-    
-    if (!State.gscData) {
-        alert('Please upload the Search Console CSV first.');
-        return;
-    }
-
-    // --- 1. Parse GSC data ---
-    const gscKeys = Object.keys(State.gscData[0]);
-    const urlKey = gscKeys.find(k => k.toLowerCase().includes('page') || k.toLowerCase().includes('url') || k.toLowerCase().includes('key'));
-    const clicksKey = gscKeys.find(k => k.toLowerCase().includes('click'));
-    const impKey = gscKeys.find(k => k.toLowerCase().includes('impression'));
-    const ctrKey = gscKeys.find(k => k.toLowerCase().includes('ctr'));
-    const posKey = gscKeys.find(k => k.toLowerCase().includes('position'));
-
-    if (!urlKey || !clicksKey) {
-        alert('GSC CSV: cannot find URL or Clicks column.\nHeaders: ' + gscKeys.join(', '));
-        return;
-    }
-
-    // Filter for /blog/ URLs and build base records
-    const blogMap = {};
-    State.gscData.forEach(row => {
-        const url = row[urlKey];
-        if (!url || typeof url !== 'string' || !url.includes('/blog/')) return;
+    try {
+        console.log('[MERGE] Starting merge...');
         
-        const cleanUrl = url.trim().replace(/\/$/, ''); // Normalise: trim & remove trailing slash
-        blogMap[cleanUrl] = {
-            url: cleanUrl,
-            clicks: Number(row[clicksKey]) || 0,
-            impressions: Number(row[impKey]) || 0,
-            ctr: row[ctrKey] || 0,
-            position: row[posKey] || 0,
-            // Defaults for optional fields
-            wordCount: 0,
-            headingCount: 0,
-            imageCount: 0,
-            title: '',
-            author: '',
-            category: 'Uncategorized',
-            publishDate: null
-        };
-    });
-
-    console.log('[MERGE] GSC blogs:', Object.keys(blogMap).length);
-
-    // --- 2. Merge Content Metrics ---
-    if (State.contentData) {
-        const cKeys = Object.keys(State.contentData[0]);
-        const cUrlKey = cKeys.find(k => k.toLowerCase().includes('url'));
-        const cWordKey = cKeys.find(k => k.toLowerCase().includes('word'));
-        const cHeadKey = cKeys.find(k => k.toLowerCase().includes('heading'));
-        const cImgKey = cKeys.find(k => k.toLowerCase().includes('image'));
-        
-        console.log('[MERGE] Content keys:', { cUrlKey, cWordKey, cHeadKey, cImgKey });
-        
-        if (cUrlKey) {
-            let matched = 0;
-            State.contentData.forEach(row => {
-                const url = (row[cUrlKey] || '').trim().replace(/\/$/, '');
-                if (blogMap[url]) {
-                    blogMap[url].wordCount = Number(row[cWordKey]) || 0;
-                    blogMap[url].headingCount = Number(row[cHeadKey]) || 0;
-                    blogMap[url].imageCount = Number(row[cImgKey]) || 0;
-                    matched++;
-                }
-            });
-            console.log('[MERGE] Content matched:', matched, '/', State.contentData.length);
+        if (!State.gscData) {
+            alert('Please upload the Search Console CSV first.');
+            return;
         }
-    }
 
-    // --- 3. Merge Metadata (join by Url Key slug) ---
-    if (State.metaData) {
-        const mKeys = Object.keys(State.metaData[0]);
-        const mSlugKey = mKeys.find(k => k.toLowerCase().includes('url key') || k.toLowerCase().includes('urlkey') || k.toLowerCase().includes('url_key') || k.toLowerCase().includes('slug'));
-        const mTitleKey = mKeys.find(k => k.toLowerCase().includes('title'));
-        const mAuthorKey = mKeys.find(k => k.toLowerCase().includes('author'));
-        const mCatKey = mKeys.find(k => k.toLowerCase().includes('categor'));
-        const mDateKey = mKeys.find(k => k.toLowerCase().includes('published'));
+        // --- 1. Parse GSC data ---
+        const gscKeys = Object.keys(State.gscData[0]);
+        console.log('[MERGE] GSC headers:', gscKeys);
         
-        console.log('[MERGE] Meta keys:', { mSlugKey, mTitleKey, mAuthorKey, mCatKey, mDateKey });
-        
-        if (mSlugKey) {
-            let matched = 0;
-            State.metaData.forEach(row => {
-                const slug = (row[mSlugKey] || '').trim();
-                if (!slug) return;
-                
-                // Find matching blog by checking if URL ends with the slug
-                const matchingUrl = Object.keys(blogMap).find(url => {
-                    const urlPath = url.split('/').pop();
-                    return urlPath === slug;
-                });
-                
-                if (matchingUrl) {
-                    const blog = blogMap[matchingUrl];
-                    if (mTitleKey) blog.title = row[mTitleKey] || '';
-                    if (mAuthorKey) blog.author = row[mAuthorKey] || '';
-                    if (mCatKey) blog.category = row[mCatKey] || 'Uncategorized';
-                    if (mDateKey && row[mDateKey]) {
-                        const d = new Date(row[mDateKey]);
-                        if (!isNaN(d.getTime())) blog.publishDate = d;
+        const urlKey = gscKeys.find(k => k.toLowerCase().includes('page') || k.toLowerCase().includes('url') || k.toLowerCase().includes('key'));
+        const clicksKey = gscKeys.find(k => k.toLowerCase().includes('click'));
+        const impKey = gscKeys.find(k => k.toLowerCase().includes('impression'));
+        const ctrKey = gscKeys.find(k => k.toLowerCase().includes('ctr'));
+        const posKey = gscKeys.find(k => k.toLowerCase().includes('position'));
+
+        console.log('[MERGE] Detected columns:', { urlKey, clicksKey, impKey, ctrKey, posKey });
+
+        if (!urlKey || !clicksKey) {
+            alert('GSC CSV: cannot find URL or Clicks column.\nHeaders: ' + gscKeys.join(', '));
+            return;
+        }
+
+        // Try filtering for /blog/ URLs first
+        let gscRows = State.gscData.filter(row => {
+            const url = row[urlKey];
+            return url && typeof url === 'string' && url.includes('/blog/');
+        });
+
+        // If no /blog/ URLs found, use ALL rows
+        if (gscRows.length === 0) {
+            console.warn('[MERGE] No /blog/ URLs found, using all rows');
+            gscRows = State.gscData.filter(row => row[urlKey] && typeof row[urlKey] === 'string');
+        }
+
+        console.log('[MERGE] GSC rows to process:', gscRows.length);
+
+        if (gscRows.length === 0) {
+            alert('No valid URLs found in the GSC CSV.\nFirst row sample: ' + JSON.stringify(State.gscData[0]));
+            return;
+        }
+
+        // Build base records
+        const blogMap = {};
+        gscRows.forEach(row => {
+            const cleanUrl = row[urlKey].trim().replace(/\/$/, '');
+            blogMap[cleanUrl] = {
+                url: cleanUrl,
+                clicks: Number(row[clicksKey]) || 0,
+                impressions: Number(row[impKey]) || 0,
+                ctr: row[ctrKey] || 0,
+                position: row[posKey] || 0,
+                wordCount: 0,
+                headingCount: 0,
+                imageCount: 0,
+                title: '',
+                author: '',
+                category: 'Uncategorized',
+                publishDate: null
+            };
+        });
+
+        console.log('[MERGE] Blog map entries:', Object.keys(blogMap).length);
+
+        // --- 2. Merge Content Metrics ---
+        if (State.contentData && State.contentData.length > 0) {
+            const cKeys = Object.keys(State.contentData[0]);
+            const cUrlKey = cKeys.find(k => k.toLowerCase().includes('url'));
+            const cWordKey = cKeys.find(k => k.toLowerCase().includes('word'));
+            const cHeadKey = cKeys.find(k => k.toLowerCase().includes('heading'));
+            const cImgKey = cKeys.find(k => k.toLowerCase().includes('image'));
+            
+            console.log('[MERGE] Content keys:', { cUrlKey, cWordKey, cHeadKey, cImgKey });
+            
+            if (cUrlKey) {
+                let matched = 0;
+                State.contentData.forEach(row => {
+                    const url = (row[cUrlKey] || '').toString().trim().replace(/\/$/, '');
+                    if (blogMap[url]) {
+                        if (cWordKey) blogMap[url].wordCount = Number(row[cWordKey]) || 0;
+                        if (cHeadKey) blogMap[url].headingCount = Number(row[cHeadKey]) || 0;
+                        if (cImgKey) blogMap[url].imageCount = Number(row[cImgKey]) || 0;
+                        matched++;
                     }
-                    matched++;
-                }
-            });
-            console.log('[MERGE] Meta matched:', matched, '/', State.metaData.length);
+                });
+                console.log('[MERGE] Content matched:', matched, '/', State.contentData.length);
+            }
         }
+
+        // --- 3. Merge Metadata (join by Url Key slug) ---
+        if (State.metaData && State.metaData.length > 0) {
+            const mKeys = Object.keys(State.metaData[0]);
+            const mSlugKey = mKeys.find(k => {
+                const lk = k.toLowerCase().trim();
+                return lk.includes('url key') || lk.includes('urlkey') || lk.includes('url_key') || lk === 'slug' || lk === 'url key';
+            });
+            const mTitleKey = mKeys.find(k => k.toLowerCase().includes('title'));
+            const mAuthorKey = mKeys.find(k => k.toLowerCase().includes('author'));
+            const mCatKey = mKeys.find(k => k.toLowerCase().includes('categor'));
+            const mDateKey = mKeys.find(k => k.toLowerCase().includes('published'));
+            
+            console.log('[MERGE] Meta keys:', { mSlugKey, mTitleKey, mAuthorKey, mCatKey, mDateKey });
+            console.log('[MERGE] Meta raw headers:', mKeys);
+            
+            if (mSlugKey) {
+                let matched = 0;
+                State.metaData.forEach(row => {
+                    const slug = (row[mSlugKey] || '').toString().trim();
+                    if (!slug) return;
+                    
+                    // Find matching blog by checking if any URL ends with the slug
+                    const matchingUrl = Object.keys(blogMap).find(url => {
+                        const urlSlug = url.split('/').filter(Boolean).pop();
+                        return urlSlug === slug;
+                    });
+                    
+                    if (matchingUrl) {
+                        const blog = blogMap[matchingUrl];
+                        if (mTitleKey) blog.title = row[mTitleKey] || '';
+                        if (mAuthorKey) blog.author = row[mAuthorKey] || '';
+                        if (mCatKey) blog.category = row[mCatKey] || 'Uncategorized';
+                        if (mDateKey && row[mDateKey]) {
+                            const d = new Date(row[mDateKey]);
+                            if (!isNaN(d.getTime())) blog.publishDate = d;
+                        }
+                        matched++;
+                    }
+                });
+                console.log('[MERGE] Meta matched:', matched, '/', State.metaData.length);
+            } else {
+                console.warn('[MERGE] Could not find Url Key column in meta CSV. Headers:', mKeys);
+            }
+        }
+
+        // --- 4. Finalize ---
+        State.merged = Object.values(blogMap);
+        console.log('[MERGE] Final dataset:', State.merged.length, 'blogs');
+
+        if (State.merged.length === 0) {
+            alert('Merge produced 0 results. Check console (F12) for details.');
+            return;
+        }
+
+        enableTabs();
+        renderBlogList();
+        analyzeData();
+        updateStatus(`${State.merged.length} blogs merged`, 'ready');
+
+        // Auto-switch to blog list
+        document.querySelector('[data-tab="blogs"]').click();
+        
+    } catch (err) {
+        console.error('[MERGE] CRASH:', err);
+        alert('Merge error: ' + err.message + '\n\nCheck the browser console (F12) for full details.');
     }
-
-    // --- 4. Finalize ---
-    State.merged = Object.values(blogMap);
-    console.log('[MERGE] Final dataset:', State.merged.length, 'blogs');
-
-    enableTabs();
-    renderBlogList();
-    analyzeData();
-    updateStatus(`${State.merged.length} blogs merged`, 'ready');
-
-    // Auto-switch to blog list
-    document.querySelector('[data-tab="blogs"]').click();
 }
 
 // ============================================================
