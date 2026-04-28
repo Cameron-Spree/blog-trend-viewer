@@ -322,14 +322,17 @@ function analyzeData() {
     const catStats = {};
     
     State.enhancedData.forEach(item => {
-        if(item.publishDate) {
-            const d = new Date(item.publishDate).getDay();
-            dayStats[d].cl += Number(item.clicks);
-            dayStats[d].ct += 1;
+        const dDate = new Date(item.publishDate);
+        if(item.publishDate && !isNaN(dDate.getTime())) {
+            const d = dDate.getDay();
+            if (dayStats[d]) {
+                dayStats[d].cl += Number(item.clicks) || 0;
+                dayStats[d].ct += 1;
+            }
         }
         const cat = item.category || "Uncategorized";
         if(!catStats[cat]) catStats[cat] = { cl: 0, ct: 0 };
-        catStats[cat].cl += Number(item.clicks);
+        catStats[cat].cl += Number(item.clicks) || 0;
         catStats[cat].ct += 1;
     });
 
