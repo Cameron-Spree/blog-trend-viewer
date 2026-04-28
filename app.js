@@ -174,6 +174,31 @@ function checkReadyToMerge() {
 // ============================================================
 // MERGE LOGIC
 // ============================================================
+function sanitizeGA4Url(urlStr) {
+    if (!urlStr || typeof urlStr !== 'string') return null;
+    
+    // Strip absolute domains
+    let cleaned = urlStr.replace(/^https?:\/\/(www\.)?lawsons\.co\.uk/i, '');
+    cleaned = cleaned.replace(/^https?:\/\/mcstaging\.lawsons\.co\.uk/i, '');
+    
+    // Truncate queries and hash parameters
+    cleaned = cleaned.split('?')[0].split('#')[0];
+    
+    // Check invalid paths
+    const lower = cleaned.toLowerCase();
+    if (lower === '/blog' || lower === '/blog/') return null;
+    if (lower.includes('/author/') || lower.includes('/category/')) return null;
+    if (lower.includes('javascript:') || lower.includes('<script>')) return null;
+    
+    // Extract exact slug
+    const parts = cleaned.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+    const slug = parts.pop();
+    if (slug === 'blog') return null; // Fallback filter
+
+    return slug;
+}
+
 function mergeAndAnalyze() {
     try {
         if (!State.gscData) {
@@ -295,8 +320,8 @@ function mergeAndAnalyze() {
 
             if (g4UrlKey) {
                 State.ga4EngData.forEach(row => {
-                    let path = (row[g4UrlKey] || '').toString().trim();
-                    const slug = path.split('/').filter(Boolean).pop();
+                    let path = row[g4UrlKey];
+                    const slug = sanitizeGA4Url(path);
                     if (!slug) return;
 
                     const matchingUrl = Object.keys(blogMap).find(url => {
@@ -326,8 +351,8 @@ function mergeAndAnalyze() {
 
             if (g4RefKey) {
                 State.ga4EcomData.forEach(row => {
-                    let ref = (row[g4RefKey] || '').toString().trim();
-                    const slug = ref.split('/').filter(Boolean).pop();
+                    let ref = row[g4RefKey];
+                    const slug = sanitizeGA4Url(ref);
                     if (!slug) return;
 
                     const matchingUrl = Object.keys(blogMap).find(url => {
