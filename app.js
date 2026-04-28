@@ -62,6 +62,11 @@ function loadPersistedData() {
                 updateStatus("Loaded saved data", "ready");
                 enableTabs();
                 analyzeData();
+                // Automatically hide dropzone and enter the dashboard
+                const dropzone = document.getElementById('dropzone');
+                if (dropzone) dropzone.classList.add('hidden');
+                const dateTab = document.querySelector('[data-tab="date"]');
+                if (dateTab) dateTab.click();
             }
         } catch (e) {
             console.error("Failed to load saved data", e);
@@ -129,10 +134,13 @@ function setupDropzone() {
 }
 
 function setupFileInput() {
-    document.getElementById('csv-file').addEventListener('change', (e) => {
+    const input = document.getElementById('csv-file');
+    input.addEventListener('click', (e) => {
+        e.target.value = ''; // Reset on click so selecting the same file triggers change again safely
+    });
+    input.addEventListener('change', (e) => {
         if (e.target.files.length) {
             handleFile(e.target.files[0]);
-            e.target.value = '';
         }
     });
 }
@@ -312,6 +320,13 @@ function finishCrawling() {
     updateStatus("All Data Synced", "ready");
     enableTabs();
     analyzeData();
+    
+    // Auto-switch to Date tab on completion if still on home tab
+    const activeTab = document.querySelector('.nav-item.active');
+    if (activeTab && activeTab.dataset.tab === 'home') {
+        const dateTab = document.querySelector('[data-tab="date"]');
+        if (dateTab) dateTab.click();
+    }
 }
 
 // --- Data Analysis & Visualization ---
