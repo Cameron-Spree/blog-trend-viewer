@@ -254,8 +254,22 @@ async function startCrawling() {
             }
         }));
 
-        // After each batch, enable tabs and show a toast
+        // After each batch: enable tabs, auto-render charts, show live count
         enableTabs();
+        
+        // On first batch, auto-switch to Date tab so user sees data immediately
+        if (batchNumber === 1) {
+            const dateTab = document.querySelector('[data-tab="date"]');
+            if (dateTab) dateTab.click();
+        }
+        
+        // Live-update the charts with whatever we have so far
+        analyzeData();
+        const activeTab = document.querySelector('.nav-item.active');
+        if (activeTab && activeTab.dataset.tab !== 'home') {
+            renderChartsForTab(activeTab.dataset.tab);
+        }
+        
         showBatchPrompt(batchNumber);
     }
 
@@ -269,16 +283,21 @@ function showBatchPrompt(batchNum) {
     const oldToast = document.getElementById('batch-toast');
     if (oldToast) oldToast.remove();
 
+    const remaining = State.batchQueue.length;
     const toast = document.createElement('div');
     toast.id = 'batch-toast';
     toast.className = 'notification-toast';
     toast.innerHTML = `
         <i data-lucide="zap"></i>
-        <span>Batch ${batchNum} ready! (${State.enhancedData.length} total URLs)</span>
-        <button onclick="refreshDashboardData()">Refresh Charts</button>
+        <span>${State.enhancedData.length} URLs analyzed${remaining > 0 ? ` — ${remaining} remaining...` : ' — All done!'}</span>
     `;
     document.getElementById('toast-container').appendChild(toast);
     lucide.createIcons();
+    
+    // Auto-dismiss after 3 seconds if processing is done
+    if (remaining === 0) {
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
+    }
 }
 
 function refreshDashboardData() {
