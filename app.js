@@ -873,6 +873,32 @@ function buildAnalyticsCharts() {
                 <td>${b.avgTime?Math.round(b.avgTime)+'s':'-'}</td>
             </tr>`).join('');
     }
+
+    // Top Engagement Table
+    const topEng = [...State.merged].filter(b => b.engagementRate > 0).sort((a,b) => b.engagementRate - a.engagementRate).slice(0, 10);
+    const engTbl = document.querySelector('#analytics-top-engagement tbody');
+    if (engTbl) {
+        engTbl.innerHTML = topEng.length === 0 
+            ? '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1rem;">No data.</td></tr>'
+            : topEng.map(b => `<tr>
+                <td title="${b.url}">${b.title || ('...'+b.url.slice(-20))}</td>
+                <td style="color:#14b8a6;font-weight:600;">${b.engagementRate.toFixed(1)}%</td>
+                <td>${Math.round(b.avgTime)}s</td>
+            </tr>`).join('');
+    }
+
+    // Top Interaction Table
+    const topInt = [...State.merged].filter(b => (b.itemsViewed + b.itemsAdded) > 0).sort((a,b) => (b.itemsViewed + b.itemsAdded) - (a.itemsViewed + a.itemsAdded)).slice(0, 10);
+    const intTbl = document.querySelector('#analytics-top-interactions tbody');
+    if (intTbl) {
+        intTbl.innerHTML = topInt.length === 0
+            ? '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:1rem;">No data.</td></tr>'
+            : topInt.map(b => `<tr>
+                <td title="${b.url}">${b.title || ('...'+b.url.slice(-20))}</td>
+                <td style="color:#38bdf8;font-weight:600;">${b.itemsViewed.toLocaleString()}</td>
+                <td style="color:#818cf8;font-weight:600;">${b.itemsAdded.toLocaleString()}</td>
+            </tr>`).join('');
+    }
 }
 
 // Chart.js helper for multi-axis support
