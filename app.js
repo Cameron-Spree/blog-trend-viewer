@@ -130,7 +130,10 @@ function setupDropzone() {
 
 function setupFileInput() {
     document.getElementById('csv-file').addEventListener('change', (e) => {
-        if (e.target.files.length) handleFile(e.target.files[0]);
+        if (e.target.files.length) {
+            handleFile(e.target.files[0]);
+            e.target.value = '';
+        }
     });
 }
 
