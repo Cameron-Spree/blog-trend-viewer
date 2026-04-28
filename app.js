@@ -519,16 +519,39 @@ function getChartConfig(type, labels, dataMaps, xOptions = {}) {
     State.activeMetrics.forEach((metric) => {
         if (!dataMaps[metric]) return;
         const axisId = yAxesCount === 0 ? 'y' : `y${yAxesCount}`;
+        const mainColor = metricPalette[metric];
+        
+        // Main dataset
         datasets.push({
             label: metricLabels[metric],
             data: dataMaps[metric],
-            backgroundColor: metricPalette[metric],
-            borderColor: metricPalette[metric],
+            backgroundColor: mainColor,
+            borderColor: mainColor,
             borderWidth: type === 'bar' ? 0 : 2,
             borderRadius: type === 'bar' ? 4 : 0,
             pointRadius: type === 'scatter' ? 5 : 3,
-            yAxisID: axisId
+            yAxisID: axisId,
+            order: 2
         });
+
+        // Trend line
+        const trendData = calculateRegression(dataMaps[metric], type === 'bar' ? labels : null);
+        if (trendData) {
+            datasets.push({
+                label: `${metricLabels[metric]} Trend`,
+                data: trendData,
+                borderColor: mainColor,
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                type: 'line',
+                yAxisID: axisId,
+                order: 1,
+                tension: 0
+            });
+        }
+
         scales[axisId] = {
             type: 'linear',
             display: true,
@@ -542,7 +565,61 @@ function getChartConfig(type, labels, dataMaps, xOptions = {}) {
         yAxesCount++;
     });
 
-    return { type, data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false, scales } };
+    return { type, data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false, scales, plugins: { legend: { labels: { filter: (item) => !item.text.includes('Trend') } } } } };
+}
+
+function calculateRegression(data, labels) {
+    if (!data || data.length < 2) return null;
+    
+    let points = [];
+    if (labels) {
+        // Bar chart or similar with categories
+        points = data.map((y, i) => ({ x: i, y: y }));
+    } else {
+        // Scatter plot with {x, y}
+        points = data.map(p => {
+            let x = p.x instanceof Date ? p.x.getTime() : p.x;
+            return { x, y: p.y };
+        });
+    }
+
+    // Filter out null/invalid points
+    points = points.filter(p => typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+    if (points.length < 2) return null;
+
+    const n = points.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    let minX = Infinity, maxX = -Infinity;
+
+    points.forEach(p => {
+        sumX += p.x;
+        sumY += p.y;
+        sumXY += p.x * p.y;
+        sumX2 += p.x * p.x;
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+    });
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    if (labels) {
+        // Return points for every label to draw across bar chart
+        return labels.map((_, i) => slope * i + intercept);
+    } else {
+        // Return two points for the scatter line
+        const result = [
+            { x: minX, y: slope * minX + intercept },
+            { x: maxX, y: slope * maxX + intercept }
+        ];
+        // If it was dates, convert back to dates for the first/last point
+        const originalData = data.find(p => (p.x instanceof Date ? p.x.getTime() : p.x) === minX);
+        if (originalData && originalData.x instanceof Date) {
+            result[0].x = new Date(minX);
+            result[1].x = new Date(maxX);
+        }
+        return result;
+    }
 }
 
 function createChart(id, cfg) {
