@@ -8,68 +8,53 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    
-    <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="brand">
                 <i data-lucide="activity"></i>
                 <h2>Trend Viewer</h2>
             </div>
-            
             <ul class="nav-links">
                 <li class="nav-item active" data-tab="home">
-                    <i data-lucide="home"></i>
-                    <span>Home</span>
+                    <i data-lucide="home"></i><span>Home</span>
                 </li>
                 <li class="nav-item disabled" data-tab="blogs">
-                    <i data-lucide="list"></i>
-                    <span>Blog List</span>
+                    <i data-lucide="list"></i><span>Blog List</span>
                 </li>
                 <li class="nav-item disabled" data-tab="date">
-                    <i data-lucide="calendar"></i>
-                    <span>Post Dates</span>
+                    <i data-lucide="calendar"></i><span>Post Dates</span>
                 </li>
                 <li class="nav-item disabled" data-tab="category">
-                    <i data-lucide="folder-tree"></i>
-                    <span>Categories</span>
+                    <i data-lucide="folder-tree"></i><span>Categories</span>
                 </li>
                 <li class="nav-item disabled" data-tab="content">
-                    <i data-lucide="file-text"></i>
-                    <span>Content Analysis</span>
+                    <i data-lucide="file-text"></i><span>Content Analysis</span>
                 </li>
             </ul>
-
             <div class="status-panel">
                 <div class="status-indicator"></div>
-                <span id="status-text">Awaiting CSV</span>
+                <span id="status-text">Awaiting Data</span>
             </div>
         </nav>
 
-        <!-- Main Content Area -->
         <main class="main-content">
             <header class="top-header">
                 <div>
                     <h1 id="page-title">Blog Performance Hub</h1>
-                    <p id="page-subtitle">Upload your Search Console data to begin.</p>
+                    <p id="page-subtitle">Upload your data files to begin analysis.</p>
                 </div>
                 <div class="actions" style="display: flex; gap: 10px; align-items: center;">
                     <button class="theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">
                         <i data-lucide="sun"></i>
                     </button>
-                    <button class="btn btn-primary" id="trigger-upload" onclick="document.getElementById('csv-file').click()">
-                        <i data-lucide="upload"></i> Upload CSV
+                    <button class="btn" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main);" onclick="location.reload()">
+                        <i data-lucide="trash-2"></i> Reset
                     </button>
-                    <button class="btn" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main);" onclick="clearAllData()">
-                        <i data-lucide="trash-2"></i> Clear
-                    </button>
-                    <input type="file" id="csv-file" accept=".csv" style="display: none;" />
                 </div>
             </header>
 
@@ -77,72 +62,78 @@
                 <!-- HOME TAB -->
                 <section id="tab-home" class="tab-pane active">
                     <div class="card instructions-card">
-                        <h3><i data-lucide="info"></i> How to Generate Your CSV Data</h3>
-                        <p>To use this dashboard, you need a Google Search Console CSV export.</p>
-                        <ol>
-                            <li>Log in to <strong>Google Search Console</strong>.</li>
-                            <li>Go to <strong>Performance</strong> > <strong>Search results</strong>.</li>
-                            <li>Set the date range (e.g., Last 3 Months).</li>
-                            <li>Switch to the <strong>Pages</strong> tab below the chart.</li>
-                            <li>Click <strong>Export</strong> > <strong>Download CSV</strong>.</li>
-                            <li>Extract the ZIP and locate <strong>Pages.csv</strong>.</li>
-                            <li>Upload that file using the button above.</li>
-                        </ol>
+                        <h3><i data-lucide="info"></i> Upload Your 3 CSV Files</h3>
+                        <p>Upload the following files. They will be merged automatically by URL.</p>
                     </div>
 
-                    <div id="dropzone" class="dropzone">
-                        <i data-lucide="arrow-down-circle" style="width: 48px; height: 48px; color: var(--text-muted);"></i>
-                        <h3>Drag & Drop Pages.csv</h3>
-                        <p>or click the upload button above.</p>
-                    </div>
-                    
-                    <!-- STAGING AREA (shown after CSV is parsed) -->
-                    <div id="staging-area" class="hidden card">
-                        <h3><i data-lucide="layers"></i> CSV Staging Area</h3>
-                        <p id="staging-summary"></p>
-                        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
-                            <label for="row-count" style="color: var(--text-muted);">Rows to process:</label>
-                            <input type="number" id="row-count" min="1" value="10" style="width: 80px; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--card-border); background: var(--bg-main); color: var(--text-main); font-size: 1rem;">
-                            <span id="row-max-label" style="color: var(--text-muted); font-size: 0.85rem;"></span>
+                    <div class="upload-grid">
+                        <!-- 1. GSC CSV -->
+                        <div class="upload-card card" id="upload-gsc">
+                            <div class="upload-icon"><i data-lucide="search"></i></div>
+                            <h4>Search Console CSV</h4>
+                            <p>Pages export with URL, Clicks, Impressions, CTR, Position</p>
+                            <div class="upload-status" id="gsc-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-gsc').click()">
+                                <i data-lucide="upload"></i> Upload
+                            </button>
+                            <input type="file" id="file-gsc" accept=".csv" style="display:none;" />
                         </div>
-                        <button class="btn btn-primary" style="margin-top: 1.25rem;" onclick="startProcessing()">
-                            <i data-lucide="play"></i> Start Processing
+
+                        <!-- 2. Content CSV -->
+                        <div class="upload-card card" id="upload-content">
+                            <div class="upload-icon"><i data-lucide="file-text"></i></div>
+                            <h4>Content Metrics CSV</h4>
+                            <p>URL, Word Count, Heading Count, Image Count</p>
+                            <div class="upload-status" id="content-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-content').click()">
+                                <i data-lucide="upload"></i> Upload
+                            </button>
+                            <input type="file" id="file-content" accept=".csv" style="display:none;" />
+                        </div>
+
+                        <!-- 3. Metadata CSV -->
+                        <div class="upload-card card" id="upload-meta">
+                            <div class="upload-icon"><i data-lucide="tag"></i></div>
+                            <h4>Blog Metadata CSV</h4>
+                            <p>Title, Status, Url Key, Author, Categories, Published At</p>
+                            <div class="upload-status" id="meta-status">Not uploaded</div>
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-meta').click()">
+                                <i data-lucide="upload"></i> Upload
+                            </button>
+                            <input type="file" id="file-meta" accept=".csv" style="display:none;" />
+                        </div>
+                    </div>
+
+                    <!-- Merge button -->
+                    <div id="merge-area" class="hidden" style="text-align: center; margin-top: 1.5rem;">
+                        <button class="btn btn-primary btn-lg" onclick="mergeAndAnalyze()">
+                            <i data-lucide="git-merge"></i> Merge Data & Build Dashboard
                         </button>
-                    </div>
-
-                    <!-- PROCESSING VIEW -->
-                    <div id="processing-view" class="hidden card processing-card">
-                        <div class="loader"></div>
-                        <h3>Analyzing URLs</h3>
-                        <p>Scraping blogs for word count, headings, images, and publish dates.</p>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="crawl-progress"></div>
-                        </div>
-                        <p id="progress-text">0 / 0 URLs Processed</p>
                     </div>
                 </section>
 
                 <!-- BLOG LIST TAB -->
                 <section id="tab-blogs" class="tab-pane">
                     <div class="card table-card" style="overflow-x: auto;">
-                        <h3><i data-lucide="list"></i> Blog Processing Status</h3>
+                        <h3><i data-lucide="list"></i> All Blogs</h3>
                         <table id="blog-list-table">
                             <thead>
                                 <tr>
-                                    <th>Status</th>
+                                    <th>Title</th>
                                     <th>URL</th>
                                     <th>Clicks</th>
-                                    <th>Impressions</th>
+                                    <th>Impr.</th>
+                                    <th>CTR</th>
+                                    <th>Position</th>
                                     <th>Words</th>
                                     <th>Headings</th>
                                     <th>Images</th>
-                                    <th>Elements</th>
+                                    <th>Author</th>
                                     <th>Category</th>
-                                    <th>Publish Date</th>
+                                    <th>Published</th>
                                 </tr>
                             </thead>
-                            <tbody id="blog-list-body">
-                            </tbody>
+                            <tbody id="blog-list-body"></tbody>
                         </table>
                     </div>
                 </section>
@@ -155,16 +146,14 @@
                             <div class="metric-value" id="best-day">-</div>
                         </div>
                         <div class="metric-card">
-                            <h4>Total Blogs Analyzed</h4>
+                            <h4>Total Blogs</h4>
                             <div class="metric-value" id="total-blogs-count">0</div>
                         </div>
                     </div>
-                    
                     <div class="chart-container card">
-                        <h3>Performance by Day of the Week (Posted)</h3>
+                        <h3>Avg Clicks by Day of the Week (Published)</h3>
                         <canvas id="chart-day-of-week"></canvas>
                     </div>
-
                     <div class="chart-container card">
                         <h3>Clicks vs Publish Date</h3>
                         <canvas id="chart-publish-date"></canvas>
@@ -178,34 +167,26 @@
                         <canvas id="chart-categories"></canvas>
                     </div>
                     <div class="card mt-4 table-card">
-                        <h3>Top Performing Categories</h3>
+                        <h3>Category Breakdown</h3>
                         <table id="category-table">
-                            <thead>
-                                <tr>
-                                    <th>Category</th>
-                                    <th>Total Posts</th>
-                                    <th>Avg Clicks</th>
-                                    <th>Avg Impressions</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Category</th><th>Posts</th><th>Avg Clicks</th><th>Avg Impressions</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
                 </section>
 
-                <!-- CONTENT ANALYSIS TAB -->
+                <!-- CONTENT TAB -->
                 <section id="tab-content" class="tab-pane">
                     <div class="metrics-grid">
                         <div class="metric-card">
-                            <h4>Avg Word Count (Top 10% Traffic)</h4>
+                            <h4>Avg Word Count (Top 10%)</h4>
                             <div class="metric-value" id="avg-word-count-top">-</div>
                         </div>
                         <div class="metric-card">
-                            <h4>Avg Images (Top 10% Traffic)</h4>
+                            <h4>Avg Images (Top 10%)</h4>
                             <div class="metric-value" id="avg-images-top">-</div>
                         </div>
                     </div>
-
                     <div class="chart-row">
                         <div class="chart-container card half">
                             <h3>Word Count vs Clicks</h3>
@@ -217,7 +198,7 @@
                         </div>
                     </div>
                     <div class="chart-container card mt-4">
-                        <h3>Headings (H1, H2, H3) vs Performance</h3>
+                        <h3>Headings vs Performance</h3>
                         <canvas id="chart-headings"></canvas>
                     </div>
                 </section>
@@ -225,10 +206,7 @@
         </main>
     </div>
 
-    <div id="toast-container"></div>
     <script src="app.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>
